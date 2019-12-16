@@ -12,9 +12,9 @@ from django.forms.models import ModelChoiceField
 
 
 
-    
-class triaAlumneForm(forms.Form):    
-    #TODO: ha de suportar prefixos per si cal triar més d'un alumne    
+
+class triaAlumneForm(forms.Form):
+    #TODO: ha de suportar prefixos per si cal triar més d'un alumne
     jquery_ajax = """
         var {busco}_done = function(res, status) {{
           if (status == "success") {{
@@ -24,19 +24,19 @@ class triaAlumneForm(forms.Form):
             // display an explanation of failure
           }}
         }}
-    
+
         var get_{busco} = function() {{
-       
+
           var d = $("#id_{soc}").val()
           if (d != "" ) {{
-            var args = {{ 
-                type:"GET", 
-                url:"/alumnes/triaAlumne{buscoCap}Ajax/"+d, 
+            var args = {{
+                type:"GET",
+                url:"/alumnes/triaAlumne{buscoCap}Ajax/"+d,
                 success:{busco}_done,
                 error:function (xhr, ajaxOptions, thrownError){{
                         alert(xhr.status);
                         alert(thrownError);
-                }}   
+                }}
              }};
             $.ajax(args);
           }}
@@ -46,31 +46,31 @@ class triaAlumneForm(forms.Form):
           return false;
         }};
     """
-    
-    jquery_nivell = jquery_ajax.format( soc='nivell', busco='curs', buscoCap='Curs' ) 
-    jquery_curs = jquery_ajax.format(soc='curs',  busco='grup', buscoCap='Grup' ) 
-    jquery_grup = jquery_ajax.format( soc='grup', busco='alumne', buscoCap='Alumne' ) 
-    
+
+    jquery_nivell = jquery_ajax.format( soc='nivell', busco='curs', buscoCap='Curs' )
+    jquery_curs = jquery_ajax.format(soc='curs',  busco='grup', buscoCap='Grup' )
+    jquery_grup = jquery_ajax.format( soc='grup', busco='alumne', buscoCap='Alumne' )
+
     nivell = forms.ModelChoiceField( queryset = Nivell.objects.all(), required = False,
-                                     widget =  SelectAjax( jquery=jquery_nivell,  
+                                     widget =  SelectAjax( jquery=jquery_nivell,
                                                            buit=False,attrs={'onchange':'get_curs();'} ) )
-    
+
     curs = forms.ModelChoiceField( queryset = Curs.objects.all(),required = False,
-                                     widget =  SelectAjax( jquery=jquery_curs, 
+                                     widget =  SelectAjax( jquery=jquery_curs,
                                                            buit=True, attrs={'onchange':'get_grup();'} ) )
-    
+
     grup = forms.ModelChoiceField( queryset = Grup.objects.all(), required = False,
-                                     widget =  SelectAjax( jquery=jquery_grup , 
+                                     widget =  SelectAjax( jquery=jquery_grup ,
                                                            buit=True, attrs={'onchange':'get_alumne();'} ) )
 
     alumne = forms.ModelChoiceField( queryset = Alumne.objects.all(),
                                      widget =  SelectAjax( buit=True ) )
-    
+
 #---form assignar grup -----------------------------------------------------------------------------------------
 class grupForm(ModelForm):
     class Meta:
         model = Grup
-        fields = ('curs', 'nom_grup' )            
+        fields = ('curs', 'nom_grup' )
 
 #---form assignar tutor-----------------------------------------------------------------------------------------
 class tutorsForm(forms.Form):
@@ -99,24 +99,24 @@ class tutorsForm(forms.Form):
         ),
         queryset=Professor.objects.all(),
         required=False)
-    
-    
+
+
 #--tutoria individualitzada:
 #from alumnes.models import Alumne
 class triaMultiplesAlumnesForm(forms.Form):
-    alumnes = forms.ModelMultipleChoiceField( queryset= None, 
+    alumnes = forms.ModelMultipleChoiceField( queryset= None,
                                           required = False,
                                           help_text=u'''Pots triar o destriar més d'un alumne prement la tecla CTRL
                                                       mentre fas clic.
-                                                      Per triar tots els alumnes selecciona el primer, 
+                                                      Per triar tots els alumnes selecciona el primer,
                                                       baixa fins a l'últim i selecciona'l mantenint ara apretada
                                                       la tecla Shift ('Majúscules'),''')
-    
+
     def __init__(self, *args, **kwargs):
         self.queryset = kwargs.pop('queryset', None)
         self.etiqueta = kwargs.pop('etiqueta', None)
         super(triaMultiplesAlumnesForm,self).__init__(*args,**kwargs)
-        self.fields['alumnes'].label = self.etiqueta 
+        self.fields['alumnes'].label = self.etiqueta
         self.fields['alumnes'].queryset = self.queryset
 
 # ---------------- PROMOCIONS ------------------------#
@@ -148,17 +148,17 @@ class newAlumne(ModelForm):
 
 ############# Choice fields ###################
 
-class triaAlumneSelect2Form(forms.Form): 
+class triaAlumneSelect2Form(forms.Form):
     alumne = ModelChoiceField(
                    widget=ModelSelect2Widget(
                                         queryset=AlumneGrup.objects.all(),
                                         search_fields = ['cognoms__icontains','nom__icontains', 'grup__descripcio_grup__icontains' ],
                                         attrs={'style':"'width': '100%'"},
                                         ),
-                   queryset=AlumneGrup.objects.all(), 
+                   queryset=AlumneGrup.objects.all(),
                    required=True)
 
 
 
-           
-    
+
+

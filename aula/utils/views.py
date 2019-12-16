@@ -41,7 +41,7 @@ def logout_page(request):
         del request.session['impersonacio']
     except KeyError:
         pass
-    
+
     logout(request)
     return HttpResponseRedirect('/')
 
@@ -49,57 +49,57 @@ def logout_page(request):
 def menu(request):
     #How do I make a variable available to all my templates?
     #http://readthedocs.org/docs/django/1.2.4/faq/usage.html#how-do-i-make-a-variable-available-to-all-my-templates
-    
-    if request.user.is_anonymous:      
-        return HttpResponseRedirect( settings.LOGIN_URL )         
+
+    if request.user.is_anonymous:
+        return HttpResponseRedirect( settings.LOGIN_URL )
     else:
         #si és un alumne l'envio a mirar el seu informe
         if Group.objects.get(name='alumne') in request.user.groups.all():
             return HttpResponseRedirect( '/open/elMeuInforme/')
-        
+
         #comprova que no té passwd per defecte:
         defaultPasswd, _ = ParametreKronowin.objects.get_or_create( nom_parametre = 'passwd', defaults={'valor_parametre':'1234'}  )
         if check_password( defaultPasswd.valor_parametre, request.user.password ):
             return HttpResponseRedirect( reverse( 'usuari__dades__canvi_passwd' ) )
-        
+
         #si no té les dades informades:
         if not request.user.first_name or not request.user.last_name:
             return HttpResponseRedirect( '/usuaris/canviDadesUsuari/')
 
         #prenc impersonate user:
-        (user, _) = tools.getImpersonateUser(request)    
-        
-        #si és professor ves a mostra impartir:
-        professor = User2Professor( user ) 
-        if professor is not None:
-            return HttpResponseRedirect( '/presencia/mostraImpartir/' )    
+        (user, _) = tools.getImpersonateUser(request)
 
-    
+        #si és professor ves a mostra impartir:
+        professor = User2Professor( user )
+        if professor is not None:
+            return HttpResponseRedirect( '/presencia/mostraImpartir/' )
+
+
     return render(
             request,
-            'main_page.html', 
+            'main_page.html',
             { },
             )
 
-        
+
 
 @login_required
 @group_required(['direcció'])
 def carregaInicial(request):
-    
+
     return render(
             request,
-            'carregaInicial.html', 
+            'carregaInicial.html',
             { },
             )
 
-@login_required    
+@login_required
 def about(request):
-    credentials = tools.getImpersonateUser(request) 
+    credentials = tools.getImpersonateUser(request)
     (user, _ ) = credentials
-    
-    professor = User2Professor( user )     
-    
+
+    professor = User2Professor( user )
+
     report = []
     taula = tools.classebuida()
 
@@ -108,10 +108,10 @@ def about(request):
     taula.titol.enllac = None
 
     taula.capceleres = []
-    
+
     capcelera = tools.classebuida()
     capcelera.amplade = 20
-    capcelera.contingut = u'Informació' 
+    capcelera.contingut = u'Informació'
     capcelera.enllac = None
     taula.capceleres.append(capcelera)
 
@@ -120,11 +120,11 @@ def about(request):
     capcelera.contingut = u''
     taula.capceleres.append(capcelera)
 
-    
+
     taula.fileres = []
-        
+
     filera = []
-    
+
     #-by--------------------------------------------
     camp = tools.classebuida()
     camp.enllac = None
@@ -136,17 +136,17 @@ def about(request):
 
     licenseFile = open (settings.LICENSE_FILE, "r")
     tip=licenseFile.read()
-    
+
     camp = tools.classebuida()
     camp.enllac = ''
     camp.contingut = tip
     filera.append(camp)
-    
+
     taula.fileres.append( filera )
 
 #-1--------------------------------------------
     filera = []
-    
+
     camp = tools.classebuida()
     camp.enllac = None
     camp.contingut = u'Codi'
@@ -154,56 +154,56 @@ def about(request):
     filera.append(camp)
 
     #-tip--------------------------------------------
-    
+
     tip = u'''Pots revisar aquí el codi i les actualitzacions del programa.
     '''
     camp = tools.classebuida()
     camp.enllac = r'https://github.com/ctrl-alt-d/django-aula'
     camp.contingut = tip
     filera.append(camp)
-    
+
     taula.fileres.append( filera )
-    
+
     report.append(taula)
-    
+
     #--Estadistiques Professor.....................
     if professor:
         taula = tools.classebuida()
-    
+
         taula.titol = tools.classebuida()
         taula.titol.contingut = ''
         taula.titol.enllac = None
-            
+
         taula.capceleres = []
-        
+
         capcelera = tools.classebuida()
         capcelera.amplade = 20
-        capcelera.contingut = u'Estadístiques' 
+        capcelera.contingut = u'Estadístiques'
         capcelera.enllac = None
         taula.capceleres.append(capcelera)
-    
+
         capcelera = tools.classebuida()
         capcelera.amplade = 80
         capcelera.contingut = u''
         taula.capceleres.append(capcelera)
-            
+
         taula.fileres = []
-            
+
         filera = []
-        
+
         camp = tools.classebuida()
         camp.contingut = u'Percentatge de passar llista:'
-        filera.append(camp) 
-        
+        filera.append(camp)
+
         camp = tools.classebuida()
         camp.enllac = None
         qProfessor = Q(  horari__professor = professor )
-       
+
         qAvui = Q( dia_impartir = datetime.today() ) & Q( horari__hora__hora_fi__lt = datetime.now()  )
         qFinsAhir = Q( dia_impartir__lt = datetime.today() )
         qFinsAra  = qFinsAhir | qAvui
         qTeGrup = Q( horari__grup__isnull = False)
-        imparticions = Impartir.objects.filter(qProfessor & qFinsAra & qTeGrup )    
+        imparticions = Impartir.objects.filter(qProfessor & qFinsAra & qTeGrup )
         nImparticios = imparticions.count()
         nImparticionsLlistaPassada = imparticions.filter( professor_passa_llista__isnull = False ).count()
 
@@ -220,15 +220,15 @@ def about(request):
                                     nTotal,
                                     nProfessor
                                      )
-        
-        
+
+
         camp.contingut = u'{0}. {1}'.format(estadistica1, estadistica2)
-        filera.append(camp)    
-        
+        filera.append(camp)
+
         taula.fileres.append( filera )
-        
+
         report.append(taula)
-        
+
     return render(
                 request,
                 'report.html',
@@ -236,10 +236,10 @@ def about(request):
                      'head': 'About' ,
                     },
                 )
-            
-@login_required    
+
+@login_required
 def calendariDevelop(request):
-    credentials = tools.getImpersonateUser(request) 
+    credentials = tools.getImpersonateUser(request)
     (user, _ ) = credentials
 
     return render(
@@ -249,7 +249,7 @@ def calendariDevelop(request):
                      'head': 'Calendari desenvolupament.' ,
                     },
                 )
-    
+
 
 def blanc( request ):
     return render(
@@ -257,6 +257,5 @@ def blanc( request ):
                 'blanc.html',
                     {},
                 )
-    
-    
-         
+
+
