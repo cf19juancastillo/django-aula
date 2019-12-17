@@ -1,4 +1,17 @@
 # This Python file uses the following encoding: utf-8
+
+"""
+    This module offers the function calcula_menu() that composes and returns the
+    definition of the menu
+
+    The menu is a dict containing:
+    'items': list
+    'subitems': list
+    'subsubitems': list
+    'nomusuari': str
+
+"""
+
 from aula.utils.tools import classebuida
 from django.urls import resolve, reverse
 from django.contrib.auth.models import Group, User
@@ -13,7 +26,7 @@ from django.conf import settings
 from aula.apps.sortides.models import Sortida
 
 def calcula_menu( user , path ):
-    
+
     if not user.is_authenticated:
         return
 
@@ -25,27 +38,27 @@ def calcula_menu( user , path ):
     co = not al and Group.objects.get_or_create(name= 'consergeria' )[0] in user.groups.all()
     pg = not al and Group.objects.get_or_create(name= 'psicopedagog' )[0] in user.groups.all()
     so = not al and Group.objects.get_or_create(name= 'sortides' )[0] in user.groups.all()
-    tu = not al and pr and ( User2Professor( user).tutor_set.exists() or User2Professor( user).tutorindividualitzat_set.exists() )    
+    tu = not al and pr and ( User2Professor( user).tutor_set.exists() or User2Professor( user).tutorindividualitzat_set.exists() )
     tots = di or pr or pl or co or al or pg
-    
+
     #Comprovar si té missatges sense llegir
     nMissatges = user.destinatari_set.filter( moment_lectura__isnull = True ).count()
     fa2segons = datetime.now() - timedelta( seconds = 2 )
     nMissatgesDelta = user.destinatari_set.filter( moment_lectura__gte = fa2segons ).count()
-    
+
     #Comprovar si té expulsions sense tramitar o cal fer expulsions per acumulació
     teExpulsionsSenseTramitar= False
     if pr:
         professor = User2Professor( user )
-        teExpulsionsSenseTramitar = professor.expulsio_set.exclude( tramitacio_finalitzada = True ).exists() 
-        
+        teExpulsionsSenseTramitar = professor.expulsio_set.exclude( tramitacio_finalitzada = True ).exists()
+
         #Acumulació Incidències
         if settings.CUSTOM_INCIDENCIES_PROVOQUEN_EXPULSIO and not teExpulsionsSenseTramitar:
             professional = User2Professional( user )
             teExpulsionsSenseTramitar = ( Alumne
                                           .objects
                                           .order_by()
-                                          .filter( incidencia__professional = professional, 
+                                          .filter( incidencia__professional = professional,
                                                    incidencia__tipus__es_informativa = False,
                                                    incidencia__gestionada_pel_tutor = False,
                                                    incidencia__es_vigent = True )
@@ -53,50 +66,51 @@ def calcula_menu( user , path ):
                                           .filter( n__gte = 3 )
                                           .exists()
                                         )
-    
+
     #Comprovar si hi ha una qualitativa oberta
     hiHaUnaQualitativaOberta = False
     if pr:
         from aula.apps.avaluacioQualitativa.models import AvaluacioQualitativa
         hiHaUnaQualitativaOberta = AvaluacioQualitativa.objects.filter(  data_obrir_avaluacio__lte =  date.today(),
                                                                          data_tancar_avaluacio__gte = date.today() ).exists()
-    
+
+    # MGG: this is the dict that contains the description of the menu options
     menu = { 'items':[], 'subitems':[], 'subsubitems':[], }
 
     try:
         nom_path = resolve( path ).url_name
     except:
         return menu
-    
+
     menu["esalumne"]=al
     if al:
         alumneuser = AlumneUser.objects.get( id = user.id )
         alumne = alumneuser.getAlumne()
         menu["nomusuari"]= u"Família de {alumne}".format( alumne=alumne.nom )
     else:
-        menu["nomusuari"]= user.first_name or user.username 
-    
+        menu["nomusuari"]= user.first_name or user.username
+
     try:
         menu_id, submenu_id, subsubmenu_id = nom_path.split( '__' )[:3]
     except:
         return menu
-    
+
     arbre_tutoria = (
                       ("Actuacions", 'tutoria__actuacions__list', tu, None, None ),
                       ("Incidències de Tutor", 'tutoria__incidencies__list', tu, None, None ),
                       ("Justificar", 'tutoria__justificar__pre_justificar', tu, None, None ),
-                      ("Cartes", 'tutoria__cartes_assistencia__gestio_cartes', tu, None, None ),                                      
+                      ("Cartes", 'tutoria__cartes_assistencia__gestio_cartes', tu, None, None ),
                       ("Alumnes", 'tutoria__alumnes__list', tu, None, None ),
-                      ("Assistència", 'tutoria__assistencia__list_entre_dates', tu, None, None ),                                      
-                      ("Informe", 'tutoria__alumne__informe_setmanal', tu, None, None ),                                      
+                      ("Assistència", 'tutoria__assistencia__list_entre_dates', tu, None, None ),
+                      ("Informe", 'tutoria__alumne__informe_setmanal', tu, None, None ),
                       ("Portal", 'tutoria__relacio_families__dades_relacio_families', tu, None, None ),
                       ("Seguiment", 'tutoria__seguiment_tutorial__formulari', tu, None, None ),
                     )
     if settings.CUSTOM_TUTORS_INFORME:
         arbre_tutoria += (
-                      ("Impressió Faltes i Incid.", 'tutoria__informe__informe_faltes_incidencies', tu, None, None ),                                      
+                      ("Impressió Faltes i Incid.", 'tutoria__informe__informe_faltes_incidencies', tu, None, None ),
                     )
-        
+
     if hasattr(settings, 'CUSTOM_MODUL_SORTIDES_ACTIU' ) and settings.CUSTOM_MODUL_SORTIDES_ACTIU and ( di or pr ):
         professor = User2Professor( user )
         filtre = [ 'P', 'R', ]
@@ -107,17 +121,32 @@ def calcula_menu( user , path ):
                        .filter( data_inici__gte = datetime.now() )
                        .filter( tutors_alumnes_convocats = professor )
                        .exists()
-                      )    
+                      )
         arbre_tutoria += (
                       ("Sortides", 'tutoria__justificarSortida__list', tu, ( u'!', 'info' ) if te_sortides_actives else None, None
-                      ),                                      
+                      ),
                     )
 
     activarModulPresenciaSetmanal=False
     if hasattr(settings, 'CUSTOM_MODUL_PRESENCIA_SETMANAL_ACTIU' ) and settings.CUSTOM_MODUL_PRESENCIA_SETMANAL_ACTIU:
         activarModulPresenciaSetmanal=True
-    
-    
+
+
+    # The following struct defines some entries in the menu
+    # The struct is as follows
+    #   - a tuple for each option in the main menu
+    #     each option tuple contains the following fields:
+    #     - item_id
+    #     - item_label
+    #     - item_url: a str that encodes menu_id, submenu_id, subsubmenu_id separated by
+    #                 '__'
+    #                 This value corresponds to the name assigned to entries in
+    #                 urls.py files, so the urls.py files are the responsible
+    #                 to translate these url names into the concrete view.
+    #     - item_condicio: the required group to see this option
+    #     - alerta
+    #     - subitems: a tuple with an struct similar to this one, except that
+    #                 subsubitems cannot hold further subsubsubitems
     arbre1 = (
 
                #--Consergeria--------------------------------------------------------------------------
@@ -128,7 +157,7 @@ def calcula_menu( user , path ):
 
                    )
                ),
-        
+
                #--Aula--------------------------------------------------------------------------
                #  id,    nom     vista                 seg      label
                ('aula', 'Aula', 'blanc__blanc__blanc', pr, teExpulsionsSenseTramitar or hiHaUnaQualitativaOberta ,
@@ -136,24 +165,24 @@ def calcula_menu( user , path ):
                       ("Presencia", 'aula__horari__horari', pr, None, None ),
                       #("Alumnes", 'aula__alumnes__alumnes_i_assignatures', pr, None, None ),
                       ("Alumnes", 'aula__alumnes__blanc', pr, None,
-                          ( 
+                          (
                             ("Els meus alumnes", 'aula__alumnes__alumnes_i_assignatures', pr, None),
-                          ),                        
-                      ),                                                            
+                          ),
+                      ),
 
                       ("Incidències", 'aula__incidencies__blanc', pr, ( u'!', 'info' ) if teExpulsionsSenseTramitar else None,
                           (
                             ("Incidències", 'aula__incidencies__les_meves_incidencies', pr, ( u'!', 'info' ) if teExpulsionsSenseTramitar else None),
                             ("Nova Incidència (fora d'aula)", 'aula__incidencies__posa_incidencia', pr, None ),
                             ("Recull Expulsió", 'aula__incidencies__posa_expulsio', pr, None),
-                          ),                        
-                      ),                                      
-                      ("Matèries", 'aula__materies__blanc', pr, None, 
-                          ( 
+                          ),
+                      ),
+                      ("Matèries", 'aula__materies__blanc', pr, None,
+                          (
                             ("Llistat entre dates", 'aula__materies__assistencia_llistat_entre_dates', pr, None),
                             ("Calculadora UF", 'aula__materies__calculadora_uf', pr, None )
                           )
-                      ),         
+                      ),
                       ("Qualitativa", 'aula__qualitativa__les_meves_avaulacions_qualitatives', pr, ( u'!', 'info' ) if hiHaUnaQualitativaOberta else None, None ),
                       ("Pres. Setmanal", 'aula__presencia_setmanal__index', pr and activarModulPresenciaSetmanal, None, None ),
                    )
@@ -167,12 +196,12 @@ def calcula_menu( user , path ):
                #--Gestió--------------------------------------------------------------------------
                ('gestio', 'Gestió', 'gestio__reserva_aula__list', co or pl, None,
                   (
-                      ("Reserva Aula", 'gestio__reserva_aula__list', co or pl, None, None),                                        
+                      ("Reserva Aula", 'gestio__reserva_aula__list', co or pl, None, None),
                       ("Cerca Alumne", 'gestio__usuari__cerca', co or pl, None, None),
-                      ("Cerca Professor", 'gestio__professor__cerca', co or pl, None, None),  
+                      ("Cerca Professor", 'gestio__professor__cerca', co or pl, None, None),
                    )
                ),
-                            
+
                #--psicopedagog--------------------------------------------------------------------------
                ('psico', 'Psicopedagog', 'psico__informes_alumne__list', pg or di, None,
                   (
@@ -184,7 +213,7 @@ def calcula_menu( user , path ):
                #--Coord.Pedag--------------------------------------------------------------------------
                ('coordinacio_pedagogica', 'Coord.Pedag', 'coordinacio_pedagogica__qualitativa__blanc', di, None,
                   (
-                      ("Qualitativa", 'coordinacio_pedagogica__qualitativa__blanc', di, None, 
+                      ("Qualitativa", 'coordinacio_pedagogica__qualitativa__blanc', di, None,
                           (
                               ("Avaluacions", 'coordinacio_pedagogica__qualitativa__avaluacions', di , None  ),
                               ("Items", 'coordinacio_pedagogica__qualitativa__items', di , None  ),
@@ -210,46 +239,65 @@ def calcula_menu( user , path ):
                ),
 
                #--Coord.Profess.--------------------------------------------------------------------------
-               ('professorat', 'Coord.Prof', 'professorat__baixes__blanc', di, None,
-                  (
-                      ("Feina Absència", 'professorat__baixes__blanc', di, None,
-                         (
+               (
+                   'professorat', 
+                   'Coord.Prof',
+                   'professorat__baixes__blanc',
+                   di,
+                   None,
+                   (
+                       ("Feina Absència", 'professorat__baixes__blanc', di, None,
+                        (
                             ('Posar feina', 'professorat__baixes__complement_formulari_tria', di, None),
                             ('Imprimir feina', 'professorat__baixes__complement_formulari_impressio_tria' ,di, None),
-                         ), 
-                      ),
-                      ("Tutors", 'professorat__tutors__blanc', di, None,
-                         (
+                        ),
+                        ),
+                       ("Tutors", 'professorat__tutors__blanc', di, None,
+                        (
                             ('Tutors Grups', 'professorat__tutors__tutors_grups', di, None),
                             ('Tutors individualitzat', 'professorat__tutors__tutors_individualitzats', di, None),
-                         ), 
-                      ),
-                      ("Professors", 'professorat__professors__list', di, None, None ),
-                      ("Estat Tramitació Exp.", 'professorat__expulsions__control_tramitacio', di, None, None ),
+                        ),
+                        ),
+                       ("Professors", 'professorat__professors__list', di, None, None ),
+                       ("Estat Tramitació Exp.", 'professorat__expulsions__control_tramitacio', di, None, None ),
                    ),
                ),
 
                #--Administració--------------------------------------------------------------------------
-               ('administracio', 'Admin', 'administracio__sincronitza__blanc', di, None,
-                  (
-                      ("Sincronitza", 'administracio__sincronitza__blanc', di, None, 
-                        (
-                          ("Alumnes ESO/BAT", 'administracio__sincronitza__esfera', di , None  ),
-                          ("Alumnes Cicles", 'administracio__sincronitza__saga', di, None),
-                          ("Horaris", 'administracio__sincronitza__kronowin', di , None  ),
-                          ("Aules", 'gestio__aula__assignacomentari', di, None),
-                          ("Reprograma", 'administracio__sincronitza__regenerar_horaris', di , None  ),
+               (
+                   'administracio',                         # item_id
+                   'Admin',                                 # item_label
+                   'administracio__sincronitza__blanc',     # item_url
+                   di,                                      # item_condicio (allowed users)
+                   None,                                    # alerta
+                   (                                        # subitems
+                       (
+                           "Sincronitza",                           # subitem_label
+                           'administracio__sincronitza__blanc',     # subitem_url
+                           di,                                      # subitem__condicio
+                           None,                                    # medalla
+                           (                                        # subsubitems
+                               (
+                                   "Alumnes ESO/BAT",                   # subitem_label
+                                   'administracio__sincronitza__esfera',# subitem_url
+                                   di,                                  # subitem_condicio
+                                   None                                 # subtitem_medalla
+                               ),
+                               ("Alumnes Cicles", 'administracio__sincronitza__saga', di, None),
+                               ("Horaris", 'administracio__sincronitza__kronowin', di , None  ),
+                               ("Aules", 'gestio__aula__assignacomentari', di, None),
+                               ("Reprograma", 'administracio__sincronitza__regenerar_horaris', di , None  ),
+                           ),
                         ),
-                      ),
-                      ("Reset Passwd", 'administracio__professorat__reset_passwd', di, None, None ),
-                      ("Càrrega Inicial", 'administracio__configuracio__carrega_inicial', di, None, None ),
-                      ("Promocions", 'administracio__promocions__llista', di, None, None),
+                       ("Reset Passwd", 'administracio__professorat__reset_passwd', di, None, None ),
+                       ("Càrrega Inicial", 'administracio__configuracio__carrega_inicial', di, None, None ),
+                       ("Promocions", 'administracio__promocions__llista', di, None, None),
 #                      ("Nou Alumne", 'administracio__alumnes__noualumne', di, None, None),
 # Aquesta pantalla encara no té implementada la seva funcionalitat.
 # Queda pendent acabar-la, o eliminar-la de l'aplicació.
                    )
                ),
-        
+
                #--relacio_families--------------------------------------------------------------------------
                ('relacio_families', u'Famílies', 'relacio_families__informe__el_meu_informe', al, None,
                   (
@@ -258,7 +306,7 @@ def calcula_menu( user , path ):
                    )
                ),
              )
-    
+
     arbre2 = (
 
                #--Varis--------------------------------------------------------------------------
@@ -272,37 +320,37 @@ def calcula_menu( user , path ):
                ),
 
              )
-    
+
     arbreSortides = ()
     if hasattr(settings, 'CUSTOM_MODUL_SORTIDES_ACTIU' ) and settings.CUSTOM_MODUL_SORTIDES_ACTIU and ( di or pr ):
-        
+
         filtre = []
         socEquipDirectiu = User.objects.filter( pk=user.pk, groups__name = 'direcció').exists()
         socCoordinador = User.objects.filter( pk=user.pk, groups__name__in = [ 'sortides'] ).exists()
-    
+
         #si sóc equip directiu només les que tinguin estat 'R' (Revisada pel coordinador)
         if socEquipDirectiu:
             filtre.append('R')
         #si sóc coordinador de sortides només les que tinguin estat 'P' (Proposada)
         if socCoordinador:
             filtre.append('P')
-        
+
         n_avis_sortides = ( Sortida
                            .objects
                            .exclude( estat = 'E' )
                            .filter( estat__in = filtre )
                            .distinct()
                            .count()
-                          )    
-        
+                          )
+
         n_avis_sortides_meves = ( Sortida
                            .objects
                            .filter( estat = 'E' )
                            .filter( professor_que_proposa__pk = user.pk )
                            .distinct( )
                            .count()
-                          )  
-        
+                          )
+
         arbreSortides = (
                #--Varis--------------------------------------------------------------------------
                ('sortides', 'Activitats', 'sortides__meves__list', di or pr, n_avis_sortides + n_avis_sortides_meves> 0,
@@ -311,11 +359,11 @@ def calcula_menu( user , path ):
                       (u"Gestió d'activitats", 'sortides__gestio__list', di or so, ( n_avis_sortides ,'info', ) if n_avis_sortides > 0 else None, None ),
                       (u"Les meves propostes d'activitats", 'sortides__meves__list', pr, ( n_avis_sortides_meves ,'info', ) if n_avis_sortides_meves > 0 else None, None ),
                    )
-               ),                            
+               ),
                          )
-    
+
     arbre = arbre1 + arbreSortides + arbre2
-    
+
     for item_id, item_label, item_url, item_condicio, alerta , subitems in arbre:
 
         if not item_condicio:
@@ -327,7 +375,7 @@ def calcula_menu( user , path ):
         item.active = 'active' if actiu else ''
         item.alerta = alerta
         menu['items'].append( item )
-        
+
         if actiu:
             for subitem_label, subitem_url, subitem__condicio, medalla, subsubitems in subitems:
                 if not subitem__condicio:
@@ -335,7 +383,7 @@ def calcula_menu( user , path ):
                 actiu = ( submenu_id == subitem_url.split('__')[1] )
                 subitem = classebuida()
                 subitem.label = safe( subitem_label )
-                subitem.url = reverse( subitem_url ) 
+                subitem.url = reverse( subitem_url )
                 subitem.active = 'active' if actiu else ''
                 if medalla:
                     omedalla = classebuida()
@@ -348,7 +396,7 @@ def calcula_menu( user , path ):
                     for subitem_label, subitem_url, subitem_condicio, subitem_medalla in subsubitems:
                         subsubitem = classebuida()
                         subsubitem.label = safe( subitem_label )
-                        subsubitem.url = reverse( subitem_url ) 
+                        subsubitem.url = reverse( subitem_url )
                         if subitem_medalla:
                             omedalla = classebuida()
                             omedalla.valor = subitem_medalla[0]
@@ -359,7 +407,6 @@ def calcula_menu( user , path ):
                         menu['subsubitems'] = subitem.subsubitems
 
     return menu
-
 
 '''
 
@@ -456,7 +503,7 @@ tutoria__relacio_families___configura_connexio
 tutoria__relacio_families__dades_relacio_families
 tutoria__relacio_families__envia_benvinguda
  tutoria__seguiment_tutorial__formulari
-        
+
 
 
 nologin__usuari__login
@@ -481,5 +528,7 @@ varis__todo__edit
 varis__todo__edit_by_pk
 varis__todo__list
 '''
-        
-                
+
+
+
+

@@ -29,16 +29,16 @@ def calculate_my_time_off(user):
 
 
 def getClientAdress( request ):
-    
+
     ip = request.get_host()
-    
+
     try:
         validate_ipv4_address( ip )
     except ValidationError:
         ip = ''
-    
+
     return ip
-    
+
 #         #TODO:  HttpRequest.get_host()  at https://docs.djangoproject.com/en/dev/ref/request-response/
 #     try:
 #         FORWARDED_FOR_FIELDS = [
@@ -55,14 +55,14 @@ def getClientAdress( request ):
 #         client_address = request.META['HTTP_X_FORWARDED_FOR']
 #     except:
 #         client_address = request.META['REMOTE_ADDR']
-#         
+#
 #     return client_address
 
 def lowpriority():
     """ Set the priority of the process to below-normal."""
 
     pass
-    
+
 def getSoftColor( obj ):
     strc = unicode( obj ) + u'con mucha marcha'
     i = 0
@@ -71,32 +71,34 @@ def getSoftColor( obj ):
         i += ( 103 * ord( s ) ) % 2001
         j = j % 573 + i * 5
     i = i*i
-    
+
     gros = 200 + i%55
-    mitja1 = 100 + j%155 
+    mitja1 = 100 + j%155
     mitja2 = 150 + (i+j)%105
-    
+
     color=(None,None,None)
     if i%3 == 0:
         if i%2 ==0:
             color = ( gros, mitja1, mitja2 )
-        else: 
+        else:
             color = ( gros, mitja2, mitja1 )
     elif i%3 == 1:
         if i%2 ==0:
             color = ( mitja1, gros, mitja2 )
-        else: 
+        else:
             color = ( mitja2, gros, mitja1 )
     elif i%3 == 2:
         if i%2 ==0:
             color = ( mitja1, mitja2, gros )
         else:
             color = ( mitja2, mitja1, gros )
-        
+
     return u'#{0:02X}{1:02X}{2:02X}'.format( color[0], color[1], color[2] )
 
 
 def getImpersonateUser( request ):
+    """ in case of impersonation, this function returns the impersonating user
+        Otherwise, it returns the request user                             """
     user = request.session['impersonacio'] if  request.session.has_key('impersonacio') else request.user
     l4 = request.session['l4'] if  request.session.has_key('l4') else False
     return ( user, l4, )
@@ -108,6 +110,7 @@ def sessioImpersonada( request ):
     (user, _ ) = getImpersonateUser(request)
     return request and request.user.is_authenticated and request.user.pk != user.pk
 
+# MGG: This class is used to create items in a menu (see aula/utils/meny.py)
 class classebuida(object):
     pass
 
@@ -115,7 +118,7 @@ class llista(list):
     def compte(self):
         return self.__len__()
     def __init__(self, *args, **kwargs):
-        super(llista,self).__init__(*args,**kwargs)    
+        super(llista,self).__init__(*args,**kwargs)
 
 class diccionari(dict):
     def compte(self):
@@ -123,7 +126,7 @@ class diccionari(dict):
     def itemsEnOrdre(self):
         return iter(sorted(self.items()))
     def __init__(self, *args, **kwargs):
-        super(dict,self).__init__(*args,**kwargs)    
+        super(dict,self).__init__(*args,**kwargs)
 
 
 
@@ -139,8 +142,8 @@ def add_secs_to_time(timeval, secs_to_add):
 
 
 def write_pdf(template_src, context_dict):
-    
-        
+
+
     template = get_template(template_src)
     #template = Template(filename = template_src, input_encoding = "utf-8")
     context = Context(context_dict)
@@ -153,7 +156,7 @@ def write_pdf(template_src, context_dict):
     else:
         response = http.HttpResponse('''Gremlin's ate your pdf! %s''' % cgi.escape(html))
 
-    
+
     return response
 
 def fetch_resources(uri, rel):

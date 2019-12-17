@@ -21,7 +21,3 @@ def dades_basiques(request):
             'my_safe_timeoff': my_timeoff - 10 if bool(my_timeoff) else my_timeoff,
             'es_direccio_o_impersonat': sessioImpersonada or user.groups.filter( name=u"direcció" ),
              }
-    
-
-        
-        

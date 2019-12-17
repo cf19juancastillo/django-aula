@@ -1,4 +1,10 @@
 # -*- coding: utf-8 -*- 
+"""
+    This module contains some configuration values for djau
+
+    XXX TODO: there are other files containing options for djau
+              They should get merged
+"""
 import os
 
 NOM_CENTRE = 'Centre C'
