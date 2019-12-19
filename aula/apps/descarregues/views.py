@@ -18,7 +18,9 @@ def descarregaAlumnes(request):
     if request.method == 'POST':
         form = descarregaAlumnesForm(request.POST)
         if form.is_valid():
-            return compose_alumnes_csv_response()
+            selected_grups = form.cleaned_data.get('grups')
+            return compose_alumnes_csv_response(
+                filtres={ 'grups': selected_grups})
     else:
         form = descarregaAlumnesForm()
 
