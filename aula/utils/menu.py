@@ -289,6 +289,7 @@ def calcula_menu( user , path ):
                                ("Reprograma", 'administracio__sincronitza__regenerar_horaris', di , None  ),
                            ),
                        ),
+
                         #MGG: new option
                        (
                            "Descarrega",

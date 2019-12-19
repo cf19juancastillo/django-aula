@@ -2,10 +2,10 @@
     url definitions for the descarregas app
 """
 from django.conf.urls import url
-from aula.apps.descarregues import views
+from .views import descarregaAlumnes
 
 urlpatterns = [
-    url(r'^descarregaAlumnes/$', views.descarregaAlumnes,
+    url(r'^descarregaAlumnes/$', descarregaAlumnes,
         name="administracio__descarrega__alumnes" ),
 ]
 
