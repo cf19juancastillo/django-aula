@@ -18,7 +18,7 @@ package usuaris {
     class AbstractAccio extends models.Model {
         tipus
         usuari
-        impersonated_from: User
+        impersonated_from: models.User
         moment
         l4
         text
@@ -39,13 +39,13 @@ package usuaris {
 
     class Departament extends AbstractDepartament
     class AlumneUsermanager extends models.Manager
-    class AlumneUser extends User
+    class AlumneUser extends models.User
     class ProfessorManager extends models.Manager
-    class Professor extends User
+    class Professor extends models.User
     class ProfessorConsergeManager extends models.Manager
-    class ProfessorConserge extends User
+    class ProfessorConserge extends models.User
     class ProfessionalManager extends models.Manager
-    class Professional extends User
+    class Professional extends models.User
     class Accio extends AbstractAccio
     class LoginUsuari extends AbstractLoginUsuari
     class OneTimePasswd extends AbstractOneTimePassword

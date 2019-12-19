@@ -288,7 +288,23 @@ def calcula_menu( user , path ):
                                ("Aules", 'gestio__aula__assignacomentari', di, None),
                                ("Reprograma", 'administracio__sincronitza__regenerar_horaris', di , None  ),
                            ),
-                        ),
+                       ),
+                        #MGG: new option
+                       (
+                           "Descarrega",
+                           "administracio__descarrega__blanc",
+                           di,
+                           None,
+                           (
+                               (
+                                   "Alumnes",
+                                   "administracio__descarrega__alumnes",
+                                   di,
+                                   None
+                               ),
+                           ),
+                       ),
+
                        ("Reset Passwd", 'administracio__professorat__reset_passwd', di, None, None ),
                        ("Càrrega Inicial", 'administracio__configuracio__carrega_inicial', di, None, None ),
                        ("Promocions", 'administracio__promocions__llista', di, None, None),
