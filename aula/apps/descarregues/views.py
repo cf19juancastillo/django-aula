@@ -8,7 +8,7 @@ from django.http import HttpResponseRedirect
 
 from aula.utils.decorators import group_required
 from .forms import descarregaAlumnesForm
-from .descarregues import compose_alumnes_csv_response
+from .utils import compose_alumnes_csv_response
 
 
 @login_required

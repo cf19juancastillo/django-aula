@@ -64,7 +64,7 @@ A dins, hi afegirem els següents fitxers:
 
   Inclourà les definicions de les urls que corresponen a descàrregues.
 
-* descarregues.py
+* utils.py
 
   Inclourà el codi que se n'encarregarà de composar els fitxers a
   descarregar.
@@ -88,7 +88,7 @@ dels alumnes
 
     from aula.utils.decorators import group_required
     from .forms import descarregaAlumnesForm
-    from .descarregues import compose_alumnes_csv_response
+    from .utils import compose_alumnes_csv_response
 
     @login_required
     @group_required(['direcció'])
@@ -146,8 +146,8 @@ En aquest cas, només ens cal afegir la url per l'opció nova:
             name="administracio__descarrega__alumnes" ),
     ]
 
-descarregues.py
----------------
+utils.py
+--------
 
 Inclou un únic mètode que composa un HttpResponse amb el contingut
 requerit en format csv.

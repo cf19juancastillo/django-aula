@@ -1,8 +1,8 @@
 # This Python file uses the following encoding: utf-8
 
 """
-    This module offers the function calcula_menu() that composes and returns the
-    definition of the menu
+    This module offers the function calcula_menu() that composes and returns
+    the definition of the menu
 
     The menu is a dict containing:
     'items': list
