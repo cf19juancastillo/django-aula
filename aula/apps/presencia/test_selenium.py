@@ -34,13 +34,13 @@ class MySeleniumTests(SeleniumLiveServerTestCase):
         #self.selenium = WebDriver()
         options = webdriver.FirefoxOptions()
         #Opció que mostra el navegador o no el mostra (prefereixo que no el mostri així puc programar mentre executo tests.)
-        #options.add_argument('-headless')
+        options.add_argument('-headless')
 
         self.selenium = webdriver.Firefox(firefox_options=options)
 
         self.selenium.implicitly_wait(5)
 
-        logging.basicConfig(filename='/tmp/ramdisk/djau.log',level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
+        logging.basicConfig(filename='/tmp/djau.log',level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
 
     def tearDown(self):
         self.selenium.close()
@@ -152,7 +152,7 @@ class MySeleniumTests(SeleniumLiveServerTestCase):
     def test_passaLlista(self):
         """ Aquest test selecciona un grup per passar llista
             Posa com a present el primer alumne i la resta com a faltes
-            Finalment comprova que
+        """
         #Passar llista convencional.
         logging.info('XXX test_passaLlista() starts')
         self.loginUsuari()
