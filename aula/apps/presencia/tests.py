@@ -68,7 +68,7 @@ class MySeleniumTests(SeleniumLiveServerTestCase):
         #Opció que mostra el navegador o no el mostra (prefereixo que no el mostri així puc programar mentre executo tests.)
         options.add_argument('-headless')
 
-        self.selenium = webdriver.Firefox(firefox_options=options)
+        self.selenium = webdriver.Firefox(options=options)
 
         self.selenium.implicitly_wait(5)
     
