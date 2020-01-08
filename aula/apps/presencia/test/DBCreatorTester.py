@@ -8,7 +8,7 @@ from aula.apps.aules.models import Aula
 from django.conf import settings
 from datetime import date, timedelta
 
-class TestDBCreator(object):
+class DBCreatorTester(object):
     '''
     Crea una BD de mostra per testejar el mòdul de presència.
     '''

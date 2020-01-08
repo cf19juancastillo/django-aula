@@ -164,7 +164,7 @@ class PresenciaSetmanalTestCaseAillament1(PresenciaSetmanalTestCase):
         #Ha de ser igual al número d'alumnes x el número d'assignatures.
         nAlumnes = len(Alumne.objects.all())
         nAssignatures = len(Assignatura.objects.all())
-        self.assertEquals(nAlumnes*nAssignatures, nceles, "El número d'elements de la taula no coincidèixen.")
+        self.assertEqual(nAlumnes*nAssignatures, nceles, "El número d'elements de la taula no coincidèixen.")
     
     def test_client_nopuc_modificar_assistencia_altri(self):
         self.generaBD()
