@@ -1,125 +1,102 @@
 # This Python file uses the following encoding: utf-8
 
-#templates
-from django.contrib import messages
-from django.template import RequestContext
+from datetime import timedelta
 
-#tables
 from django.utils.safestring import mark_safe
-
-from .tables2_models import HorariAlumneTable
 from django_tables2 import RequestConfig
-
-#from django import forms as forms
-from aula.apps.alumnes.models import Alumne,  Curs, Grup
-from aula.apps.usuaris.models import Professor
-from aula.apps.assignatures.models import Assignatura
-from aula.apps.presencia.models import Impartir, EstatControlAssistencia
-
-#workflow
 from django.http import HttpResponse
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponseRedirect
-
-#auth
-from django.contrib.auth.decorators import login_required
-from aula.utils.decorators import group_required
-from aula.apps.usuaris.models import User2Professor
-
-#forms
-from aula.apps.alumnes.forms import  triaMultiplesAlumnesForm,\
-    triaAlumneSelect2Form
-from aula.apps.alumnes.forms import triaAlumneForm
-
-#helpers
-from aula.utils import tools
-from aula.utils.tools import unicode
-from aula.apps.presencia.models import Impartir
 from django.utils.datetime_safe import  date, datetime
-from datetime import timedelta
+from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.forms.models import modelformset_factory
-from aula.apps.alumnes.reports import reportLlistaTutorsIndividualitzats
-from aula.apps.avaluacioQualitativa.forms import alumnesGrupForm
-from aula.apps.tutoria.models import TutorIndividualitzat
-from aula.apps.alumnes.rpt_duplicats import duplicats_rpt
-from aula.apps.alumnes.tools import fusiona_alumnes_by_pk
-from aula.apps.alumnes.forms import promoForm, newAlumne
+
+from aula.apps.alumnes.models import Alumne, Curs, Grup
+from aula.apps.usuaris.models import Professor
+from aula.apps.usuaris.models import User2Professor
+from aula.apps.presencia.models import Impartir
+
+from aula.utils.decorators import group_required
+
+from aula.apps.alumnes.forms import triaMultiplesAlumnesForm
+from aula.apps.alumnes.forms import triaAlumneSelect2Form
+from aula.apps.alumnes.forms import triaAlumneForm
+
+from aula.utils import tools
+from aula.utils.tools import unicode
+from aula.apps.tutoria.models import TutorIndividualitzat, Tutor
+
+from .reports import reportLlistaTutorsIndividualitzats
+from .rpt_duplicats import duplicats_rpt
+from .tools import fusiona_alumnes_by_pk
+from .forms import promoForm, newAlumne, tutorsForm
+from .tables2_models import HorariAlumneTable
 
 #duplicats
 @login_required
 @group_required(['direcció'])
 def duplicats(request):
+    """ This view shows a report of duplicated """
+
     report = duplicats_rpt()
-    
-    return render(
-            request,
-            'report.html',
-                {'report': report,
-                 'head': 'Alumnes' ,
-                },
-                )
-    
+    return render(request, 'report.html',
+                  {'report': report, 'head': 'Alumnes', },
+                  )
+
 
 #duplicats
 @login_required
 @group_required(['direcció'])
 def fusiona(request,pk):
+    """ XXX define doc """
 
     credentials = tools.getImpersonateUser(request)
-    resultat = { 'errors': [], 'warnings':  [], 'infos':  [ u'Procés realitzat correctament' ]  }
+    resultat = {'errors': [], 'warnings':  [], 'infos':  [u'Procés realitzat correctament']}
     try:
-        fusiona_alumnes_by_pk( int( pk ) , credentials)
+        fusiona_alumnes_by_pk(int(pk), credentials)
     except Exception as e:
-        resultat = { 'errors': [ unicode(e), ], 'warnings':  [], 'infos':  []  }
-        
-    
-    return render(
-                    request,
-                   'resultat.html', 
-                   {'head': u'Error a l\'esborrar actuació.' ,
-                    'msgs': resultat },
-                )
- 
+        resultat = {'errors': [unicode(e),], 'warnings':  [], 'infos':  []}
 
-#vistes--------------------------------------------------------------------------------------
+    return render(request, 'resultat.html',
+                  {'head': u'Error a l\'esborrar actuació.', 'msgs': resultat },
+                 )
 
-  
 
 #vistes--------------------------------------------------------------------------------------
 
 @login_required
 @group_required(['direcció'])
-def assignaTutors( request ):
+def assignaTutors(request):
+    """ XXX define doc """
+
     #FormSet: Una opció seria fer servir formSet, però em sembla que
     #com ho estic fent ara és més fàcil per l'usuari
     #https://docs.djangoproject.com/en/dev/topics/forms/formsets
-    from aula.apps.tutoria.models import Tutor 
-    from aula.apps.alumnes.forms import tutorsForm
     #prefixes:
-    #https://docs.djangoproject.com/en/dev/ref/forms/api/#prefixes-for-forms    
+    #https://docs.djangoproject.com/en/dev/ref/forms/api/#prefixes-for-forms
     formset = []
     if request.method == "POST":
         #un formulari per cada grup
         #totBe = True
         parellesProfessorGrup=set()
         for grup in Grup.objects.all():
-            form=tutorsForm(
-                                    request.POST,
-                                    prefix=str( grup.pk )
-                            )
-            formset.append( form )
+            form = tutorsForm(request.POST, prefix=str(grup.pk))
+            formset.append(form)
             if form.is_valid():
                 tutor1 = form.cleaned_data['tutor1']
                 tutor2 = form.cleaned_data['tutor2']
                 tutor3 = form.cleaned_data['tutor3']
-                if tutor1:  parellesProfessorGrup.add( (tutor1.pk, grup)  )
-                if tutor2:  parellesProfessorGrup.add( (tutor2.pk, grup)  )
-                if tutor3:  parellesProfessorGrup.add( (tutor3.pk, grup)  )
+                if tutor1:
+                    parellesProfessorGrup.add((tutor1.pk, grup))
+                if tutor2:
+                    parellesProfessorGrup.add((tutor2.pk, grup))
+                if tutor3:
+                    parellesProfessorGrup.add((tutor3.pk, grup))
             else:
                 pass
                 #totBe = False
-                
+
         Tutor.objects.all().delete()
         for tutor_pk, grup in   parellesProfessorGrup:
             professor = Professor.objects.get( pk = tutor_pk )
@@ -127,45 +104,42 @@ def assignaTutors( request ):
             nouTutor.save()
             #return HttpResponseRedirect( '/' )
 
-                
+
     else:
         for grup in Grup.objects.all():
             tutor1 = tutor2 = tutor3 = None
-            if len( grup.tutor_set.all() ) > 0: tutor1 = grup.tutor_set.all()[0].professor
-            if len( grup.tutor_set.all() ) > 1: tutor2 = grup.tutor_set.all()[1].professor
-            if len( grup.tutor_set.all() ) > 2: tutor3 = grup.tutor_set.all()[2].professor
-            form=tutorsForm(
-                                    prefix=str( grup.pk ),
-                                    initial={ 'grup':  grup ,
-                                             'tutor1': tutor1,
-                                             'tutor2': tutor2,
-                                             'tutor3': tutor3
-                                             } )            
-            formset.append( form )
-            
-    return render(
-                    request,
-                  "formsetgrid.html", 
-                  { "formset": formset,
-                    "head": "Gestió de tutors",
-                   }
-                )
+            if len(grup.tutor_set.all()) > 0: tutor1 = grup.tutor_set.all()[0].professor
+            if len(grup.tutor_set.all()) > 1: tutor2 = grup.tutor_set.all()[1].professor
+            if len(grup.tutor_set.all()) > 2: tutor3 = grup.tutor_set.all()[2].professor
+            form = tutorsForm(prefix=str(grup.pk),
+                              initial={'grup':  grup ,
+                                       'tutor1': tutor1,
+                                       'tutor2': tutor2,
+                                       'tutor3': tutor3
+                                       })
+            formset.append(form)
+
+    return render(request,
+                  "formsetgrid.html",
+                  {"formset": formset, "head": "Gestió de tutors",}
+                 )
 
 
 @login_required
 @group_required(['direcció'])
 def llistaTutorsIndividualitzats( request ):
+    """ XXX define doc """
 
-    credentials = tools.getImpersonateUser(request) 
+    credentials = tools.getImpersonateUser(request)
     (user, _ ) = credentials
 
-    professor = User2Professor( user ) 
-        
+    professor = User2Professor( user )
+
     head=u'Tutors Individualitzats'
     infoForm = []
-    
+
     report = reportLlistaTutorsIndividualitzats(  )
-     
+
     return render(
             request,
             'report.html',
@@ -178,21 +152,21 @@ def llistaTutorsIndividualitzats( request ):
 @login_required
 @group_required(['direcció','psicopedagog'])
 def informePsicopedagoc( request  ):
-
-    credentials = tools.getImpersonateUser(request) 
+    """ XXX define doc """
+    credentials = tools.getImpersonateUser(request)
     (user, l4 ) = credentials
 
     if request.method == 'POST':
-        
-        formAlumne = triaAlumneSelect2Form(request.POST ) #todo: multiple=True (multiples alumnes de cop)        
-        if formAlumne.is_valid():            
+
+        formAlumne = triaAlumneSelect2Form(request.POST ) #todo: multiple=True (multiples alumnes de cop)
+        if formAlumne.is_valid():
             alumne = formAlumne.cleaned_data['alumne']
             return HttpResponseRedirect( r'/tutoria/detallTutoriaAlumne/{0}/all/'.format( alumne.pk ) )
-        
+
     else:
 
-        formAlumne = triaAlumneSelect2Form( )         
-        
+        formAlumne = triaAlumneSelect2Form( )
+
     return render(
                 request,
                 'form.html',
@@ -205,15 +179,16 @@ def informePsicopedagoc( request  ):
 @login_required
 @group_required(['direcció'])
 def gestionaAlumnesTutor( request , pk ):
-    credentials = tools.getImpersonateUser(request) 
+    """ XXX define doc """
+    credentials = tools.getImpersonateUser(request)
     (user, _ ) = credentials
 
     professor = Professor.objects.get( pk = int(pk) )
-        
+
     head=u'Tutors Individualitzats'
-    infoForm = []    
+    infoForm = []
     formset = []
-    
+
     if request.method == 'POST':
         totBe = True
         nous_alumnes_tutor = []
@@ -222,10 +197,10 @@ def gestionaAlumnesTutor( request , pk ):
             form=triaMultiplesAlumnesForm(
                                     request.POST,
                                     prefix=str( grup.pk ),
-                                    queryset =  grup.alumne_set.all()  ,                                    
-                                    etiqueta = unicode( grup )  
+                                    queryset =  grup.alumne_set.all()  ,
+                                    etiqueta = unicode( grup )
                                     )
-            formset.append( form )        
+            formset.append( form )
             if form.is_valid():
                 for alumne in form.cleaned_data['alumnes']:
                     nous_alumnes_tutor.append( alumne )
@@ -237,7 +212,7 @@ def gestionaAlumnesTutor( request , pk ):
                 ti = TutorIndividualitzat( professor = professor, alumne = alumne  )
                 ti.credentials = credentials
                 ti.save()
-               
+
             return HttpResponseRedirect( '/alumnes/llistaTutorsIndividualitzats/' )
     else:
         for grup in Grup.objects.filter( alumne__isnull = False ).distinct():
@@ -245,15 +220,15 @@ def gestionaAlumnesTutor( request , pk ):
             inicial= [c.pk for c in grup.alumne_set.filter( tutorindividualitzat__professor = professor ) ]
             form=triaMultiplesAlumnesForm(
                                     prefix=str( grup.pk ),
-                                    queryset =  grup.alumne_set.all()  ,                                    
+                                    queryset =  grup.alumne_set.all()  ,
                                     etiqueta = unicode( grup )  ,
                                     initial =  {'alumnes': inicial }
                                     )
             formset.append( form )
-        
+
     return render(
                 request,
-                  "formset.html", 
+                  "formset.html",
                   {"formset": formset,
                    "head": head,
                    "formSetDelimited": True,
@@ -265,18 +240,19 @@ def gestionaAlumnesTutor( request , pk ):
 @login_required
 @group_required(['consergeria','professors','professional'])
 def triaAlumne( request ):
+    """ XXX define doc """
     if not request.user.is_authenticated:
         return render('/login')
 
     if request.method == 'POST':
-        
-        form = triaAlumneForm(request.POST)        
+
+        form = triaAlumneForm(request.POST)
         if form.is_valid():
             return HttpResponse( unicode( form.cleaned_data['alumne'] )  )
     else:
-    
+
         form = triaAlumneForm()
-        
+
     return render(
                 request,
                 'form.html',
@@ -290,6 +266,7 @@ def triaAlumne( request ):
 @login_required
 @group_required(['consergeria','professors','professional'])
 def triaAlumneCursAjax( request, id_nivell ):
+    """ XXX define doc """
     if request.method == 'GET':  #request.is_ajax()
         id_nivell = int( id_nivell )
         cursos = Curs.objects.filter( nivell__pk = id_nivell )
@@ -301,6 +278,7 @@ def triaAlumneCursAjax( request, id_nivell ):
 @login_required
 @group_required(['consergeria','professors','professional'])
 def triaAlumneGrupAjax( request, id_curs ):
+    """ XXX define doc """
     if request.method == 'GET':   #request.is_ajax()
         pk = int( id_curs )
         tots = Grup.objects.filter( curs__pk = pk )
@@ -312,6 +290,7 @@ def triaAlumneGrupAjax( request, id_curs ):
 @login_required
 @group_required(['consergeria','professors','professional'])
 def triaAlumneAlumneAjax( request, id_grup ):
+    """ XXX define doc """
     if request.method == 'GET':   #request.is_ajax()
         pk = int( id_grup )
         tots = Alumne.objects.filter( grup__pk = pk )
@@ -322,32 +301,32 @@ def triaAlumneAlumneAjax( request, id_grup ):
 
 #---------------------  --------------------------------------------#
 
-    
+
 @login_required
 @group_required(['professors'])
 def elsMeusAlumnesAndAssignatures( request ):
-
+    """ XXX define doc """
     (user, l4) = tools.getImpersonateUser(request)
-    professor = User2Professor( user )     
-    
+    professor = User2Professor( user )
+
     report = []
-    
+
     nTaula=0
 
     assignatura_grup = set()
     for ca in Impartir.objects.filter( horari__professor = professor ):
-        if ca.horari.grup is not None: 
+        if ca.horari.grup is not None:
             assignatura_grup.add( (ca.horari.assignatura, ca.horari.grup )  )
-            
-    for (assignatura, grup,) in  assignatura_grup: 
-    
+
+    for (assignatura, grup,) in  assignatura_grup:
+
         taula = tools.classebuida()
         taula.codi = nTaula; nTaula+=1
         taula.tabTitle = u'{0} - {1}'.format(unicode( assignatura ) , unicode( grup ) )
-        
+
         taula.titol = tools.classebuida()
         taula.titol.contingut = ""
-        
+
         capcelera_nom = tools.classebuida()
         capcelera_nom.amplade = 25
         capcelera_nom.contingut = u'{0} - {1}'.format(unicode( assignatura ) , unicode( grup ) )
@@ -363,75 +342,75 @@ def elsMeusAlumnesAndAssignatures( request ):
         capcelera_nFaltes = tools.classebuida()
         capcelera_nFaltes.amplade = 15
         nClasses = Impartir.objects.filter( horari__professor = professor ,
-                                            horari__assignatura = assignatura, 
-                                            horari__grup = grup 
+                                            horari__assignatura = assignatura,
+                                            horari__grup = grup
                                             ).count()
-        nClassesImpartides =   Impartir.objects.filter( 
+        nClassesImpartides =   Impartir.objects.filter(
                                             horari__professor = professor ,
-                                            horari__assignatura = assignatura, 
-                                            horari__grup = grup, 
-                                            dia_impartir__lte = date.today() 
-                                            ).count() 
+                                            horari__assignatura = assignatura,
+                                            horari__grup = grup,
+                                            dia_impartir__lte = date.today()
+                                            ).count()
 
-        capcelera_nFaltes.contingut = u' ({0}h impartides / {1}h)'.format( nClassesImpartides, nClasses)            
+        capcelera_nFaltes.contingut = u' ({0}h impartides / {1}h)'.format( nClassesImpartides, nClasses)
 
         capcelera_contacte = tools.classebuida()
         capcelera_contacte.amplade = 45
         capcelera_contacte.contingut = u'Dades de contacte Tutors.'
-        
+
         taula.capceleres = [capcelera_nom, capcelera_nIncidencies, capcelera_assistencia, capcelera_nFaltes, capcelera_contacte]
-        
+
         taula.fileres = []
-        for alumne in Alumne.objects.filter( 
+        for alumne in Alumne.objects.filter(
                             controlassistencia__impartir__horari__grup = grup,
-                            controlassistencia__impartir__horari__assignatura = assignatura, 
+                            controlassistencia__impartir__horari__assignatura = assignatura,
                             controlassistencia__impartir__horari__professor = professor  ).distinct().order_by('cognoms'):
-            
+
             filera = []
-            
+
             #-nom--------------------------------------------
             camp_nom = tools.classebuida()
             camp_nom.enllac = None
             camp_nom.contingut = u'{0}'.format( alumne )
             filera.append(camp_nom)
-            
+
             #-incidències--------------------------------------------
             camp_nIncidencies = tools.classebuida()
             camp_nIncidencies.enllac = None
             nIncidencies = alumne.incidencia_set.filter(
                                                         control_assistencia__impartir__horari__grup = grup,
-                                                        control_assistencia__impartir__horari__professor = professor, 
+                                                        control_assistencia__impartir__horari__professor = professor,
                                                         control_assistencia__impartir__horari__assignatura = assignatura,
-                                                        tipus__es_informativa = False 
+                                                        tipus__es_informativa = False
                                                        ).count()
-            nExpulsions = alumne.expulsio_set.filter( 
+            nExpulsions = alumne.expulsio_set.filter(
                                                         control_assistencia__impartir__horari__grup = grup,
-                                                        control_assistencia__impartir__horari__professor = professor, 
+                                                        control_assistencia__impartir__horari__professor = professor,
                                                         control_assistencia__impartir__horari__assignatura = assignatura
                                                     ).exclude(
                                                         estat = 'ES'
                                                     ).count()
-            camp_nIncidencies.multipleContingut = [ ( u'Incid: {0}'.format( nIncidencies ), None, ), 
+            camp_nIncidencies.multipleContingut = [ ( u'Incid: {0}'.format( nIncidencies ), None, ),
                                                     ( u'Expul: {0}'.format( nExpulsions), None,  ) ]
             filera.append(camp_nIncidencies)
 
             #-Assistencia--------------------------------------------
             from django.db.models import Sum, Count
-#                nFaltes = alumne.controlassistencia_set.filter( 
+#                nFaltes = alumne.controlassistencia_set.filter(
 #                                                               estat__isnull = False  ,
 #                                                               impartir__horari__assignatura = assignatura
-#                                                        ).aggregate( 
+#                                                        ).aggregate(
 #                                        ausencia = Sum( 'estat__pct_ausencia' ),
-#                                        classes = Count( 'estat' ) 
+#                                        classes = Count( 'estat' )
 #                                                        )
-            
-            controls = alumne.controlassistencia_set.filter(   
-                                                    impartir__dia_impartir__lte = datetime.today(), 
+
+            controls = alumne.controlassistencia_set.filter(
+                                                    impartir__dia_impartir__lte = datetime.today(),
                                                     impartir__horari__grup = grup,
-                                                    impartir__horari__professor = professor, 
-                                                    impartir__horari__assignatura = assignatura 
+                                                    impartir__horari__professor = professor,
+                                                    impartir__horari__assignatura = assignatura
                                                            )
-            
+
             nFaltesNoJustificades = controls.filter(  Q(estat__codi_estat = 'F' )  ).count()
             nFaltesJustificades = controls.filter( estat__codi_estat = 'J'  ).count()
             nRetards = controls.filter( estat__codi_estat = 'R'  ).count()
@@ -462,9 +441,9 @@ def elsMeusAlumnesAndAssignatures( request ):
                                                                         alumne.rp2_correu ), None,)]
             filera.append(camp)
             taula.fileres.append( filera )
-        
+
         report.append(taula)
-        
+
     return render(
                 request,
                 'reportTabs.html',
@@ -472,15 +451,16 @@ def elsMeusAlumnesAndAssignatures( request ):
                      'head': u'Informació alumnes' ,
                     },
                 )
-        
+
 
 
 #---------------------  --------------------------------------------#
 
-    
+
 @login_required
 @group_required(['professors'])
 def blanc( request ):
+    """ XXX define doc """
     return render(
                 request,
                 'blanc.html',
@@ -493,12 +473,14 @@ def blanc( request ):
 @login_required
 @group_required(['direcció'])
 def llistaGrupsPromocionar(request):
+    """ XXX define doc """
     grups = Grup.objects.all().order_by("descripcio_grup")
     return render(request,'mostraGrupsPromocionar.html', {"grups" : grups})
 
 @login_required
 @group_required(['direcció'])
 def nouAlumnePromocionar(request):
+    """ XXX define doc """
     #Aqui va el tractament del formulari i tota la polla...
 
     if request.method == 'POST':
@@ -510,6 +492,7 @@ def nouAlumnePromocionar(request):
 @login_required
 @group_required(['direcció'])
 def mostraGrupPromocionar(request, grup=""):
+    """ XXX define doc """
 
     from datetime import date
     PromoFormset = modelformset_factory(Alumne, form=promoForm, extra = 0)
@@ -558,6 +541,7 @@ def mostraGrupPromocionar(request, grup=""):
 @login_required
 @group_required(['consergeria','professors'])
 def detallAlumneHorari(request, pk, detall='all'):
+    """ XXX define doc """
     credentials = tools.getImpersonateUser(request)
     (user, l4) = credentials
 
@@ -569,7 +553,7 @@ def detallAlumneHorari(request, pk, detall='all'):
     try:
         data = datetime.strptime(data_txt, r"%Y-%m-%d").date()
     except ValueError:
-        data = datetime.today()    
+        data = datetime.today()
 
     qAvui = Q(impartir__dia_impartir=data)
     alumne = get_object_or_404( Alumne, pk=pk)
@@ -619,11 +603,11 @@ def detallAlumneHorari(request, pk, detall='all'):
 
         for aula in aules:
             if horari.hora == aula['hora']:
-                aula['horari_grup'] = ( aula['horari_grup'] 
-                                        + u'\n' + horari.nom_aula 
-                                        + u' ' + unicode( horari.professor )  
-                                        + u' ' + unicode( horari.assignatura )
-                                      )
+                aula['horari_grup'] = (aula['horari_grup']
+                                       + u'\n' + horari.nom_aula
+                                       + u' ' + unicode(horari.professor)
+                                       + u' ' + unicode(horari.assignatura)
+                                       )
                 horanova = False
         if horanova:
             novaaula = {'horari_alumne': '',
@@ -634,7 +618,7 @@ def detallAlumneHorari(request, pk, detall='all'):
                                            <= datetime.now().time()
                                            <= horari.hora.hora_fi),
                         'no_ha_de_ser_a_laula': '',
-                        'horari_grup': ( horari.nom_aula + u' ' 
+                        'horari_grup': (horari.nom_aula + u' '
                                          + unicode( horari.professor )
                                          + u' ' + unicode( horari.assignatura )
                                        ),
@@ -663,6 +647,7 @@ def detallAlumneHorari(request, pk, detall='all'):
 @login_required
 @group_required(['professional','consergeria',])
 def cercaUsuari(request):
+    """ XXX define doc """
     credentials = tools.getImpersonateUser(request)
     (user, l4) = credentials
 
@@ -672,7 +657,7 @@ def cercaUsuari(request):
             alumne = formUsuari.cleaned_data['alumne']
             next_url = r'/alumnes/detallAlumneHorari/{0}/all/'
             return HttpResponseRedirect(next_url.format(alumne.pk))
-            
+
     else:
         formUsuari = triaAlumneSelect2Form()
     return render(
@@ -682,8 +667,3 @@ def cercaUsuari(request):
          'head': 'Triar usuari'
          }
         )
-
-
-
-
-    

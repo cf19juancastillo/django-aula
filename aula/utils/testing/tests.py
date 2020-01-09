@@ -1,5 +1,6 @@
-#encoding: utf-8
-# Utilitats compartides per fer testing.
+"""
+    Utilitats compartides per fer testing.
+"""
 
 from aula.apps.usuaris.models import Professor, Group
 from aula.apps.alumnes.models import Grup, Alumne
@@ -16,7 +17,7 @@ class TestUtils():
 
     diesSetmana = ["Dilluns", "Dimarts", "Dimecres", "Dijous", "Divendres", "Dissabte", "Diumenge"]
     diesSetmana2Lletres = ["DL", "DM", "DI", "DJ", "DV", "DS", "DU"]
-    
+
     def crearProfessor(self, nomUsuari, passwordUsuari, mail="mail@mailserver.com"):
     # type:(str, str) -> Professor
         grupProfessors, _ = Group.objects.get_or_create(name='professors')
@@ -29,7 +30,7 @@ class TestUtils():
         profe1.last_name = "cognom_" + nomUsuari
         profe1.email = mail
         profe1.save()
-        
+
         return profe1
 
     def generaAlumnesDinsUnGrup(self, grupAlumnes, nAlumnesAGenerar):
@@ -37,26 +38,43 @@ class TestUtils():
         noms = [u'Xevi',u'Joan',u'Pere',u'Lluís',u'Brandom',u'Maria',u'Lola',u'Azucena']
         cognoms = [u'Serra',u'Vazquez',u'García',u'Moreno',u'Vila',u'Vilamitjana']
         alumnesGenerats = [] #type: List[Alumne]
-        
+
         if nAlumnesAGenerar > (len(noms)*len(cognoms)):
             raise Exception("Error no pots generar tants alumnes, sortirien repetits.")
 
         nCognom = 0
         nNom = 0
         for i in range(0,nAlumnesAGenerar):
-            alumne = Alumne.objects.create(ralc=100, grup=grupAlumnes, 
-                nom=noms[nNom], 
-                cognoms=cognoms[nCognom], 
-                tutors_volen_rebre_correu=False,
-                data_neixement=date(1990,7,7) #english date.
-                ) 
+            #alumne = Alumne.objects.create(ralc=100, grup=grupAlumnes,
+            #    nom=noms[nNom],
+            #    cognoms=cognoms[nCognom],
+            #    tutors_volen_rebre_correu=False,
+            #    data_neixement=date(1990,7,7) #english date.
+            #    )
+            alumne = self.afegeix_alumne_a_grup(noms[nNom], cognoms[nCognom], date(1990, 7, 7), grupAlumnes)
             alumnesGenerats.append(alumne)
             nNom+=1
             if nNom == len(noms):
                 nCognom+=1
                 nNom = 0
         return alumnesGenerats
-        
+
+    def afegeix_alumne_a_grup(self, nom, cognoms, data_neixement, grup):
+        """ Afegeix l'alumne al grup
+            nom: str
+            cognoms: str
+            data_naixement: date
+            grup: Grup
+            Retorna l'alumne generat
+        """
+        return Alumne.objects.create(ralc=100, 
+                                     grup=grup,
+                                     nom=nom,
+                                     cognoms=cognoms,
+                                     tutors_volen_rebre_correu=False,
+                                     data_neixement=data_neixement)
+
+
     def generarEstatsControlAssistencia(self):
         #type: ()->Dict[str, EstatControlAssistencia]
         estats = {} #type: Dict[str, EstatControlAssistencia]
