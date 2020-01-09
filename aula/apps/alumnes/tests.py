@@ -6,7 +6,7 @@ from datetime import date
 from django.test import TestCase
 
 from aula.apps.alumnes.models import Nivell, Curs, Grup
-from .rpt_duplicats import duplicats_rpt
+from .utils import duplicats_rpt
 from .models import Alumne
 
 from aula.utils.testing.tests import TestUtils

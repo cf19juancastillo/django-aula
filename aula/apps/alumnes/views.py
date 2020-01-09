@@ -28,7 +28,7 @@ from aula.utils.tools import unicode
 from aula.apps.tutoria.models import TutorIndividualitzat, Tutor
 
 from .reports import reportLlistaTutorsIndividualitzats
-from .rpt_duplicats import duplicats_rpt
+from .utils import duplicats_rpt
 from .tools import fusiona_alumnes_by_pk
 from .forms import promoForm, newAlumne, tutorsForm
 from .tables2_models import HorariAlumneTable
