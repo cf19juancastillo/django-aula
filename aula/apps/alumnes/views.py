@@ -18,16 +18,15 @@ from aula.apps.usuaris.models import User2Professor
 from aula.apps.presencia.models import Impartir
 
 from aula.utils.decorators import group_required
-
-from aula.apps.alumnes.forms import triaMultiplesAlumnesForm
-from aula.apps.alumnes.forms import triaAlumneSelect2Form
-from aula.apps.alumnes.forms import triaAlumneForm
-
 from aula.utils import tools
 from aula.utils.tools import unicode
 from aula.apps.tutoria.models import TutorIndividualitzat, Tutor
 
-from .reports import reportLlistaTutorsIndividualitzats
+from .forms import triaMultiplesAlumnesForm
+from .forms import triaAlumneSelect2Form
+from .forms import triaAlumneForm
+
+from .utils import reportLlistaTutorsIndividualitzats
 from .utils import duplicats_rpt
 from .tools import fusiona_alumnes_by_pk
 from .forms import promoForm, newAlumne, tutorsForm
