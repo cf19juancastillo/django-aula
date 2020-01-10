@@ -89,9 +89,11 @@ def regeneraImpartir(request):
                 )
 
 
+
 @login_required
 @group_required(['professors'])
 def mostraImpartir(request, year=None, month=None, day=None):
+    """ vista que mostra les franges horàries d'una setmana """
 
     def compute_current_date(year, month, day):
         """ 
@@ -146,20 +148,24 @@ def mostraImpartir(request, year=None, month=None, day=None):
         return data_actual + delta
 
 
-    credentials = getImpersonateUser(request)
-    (user, _ ) = credentials
+    def get_professor_or_redirect(request):
+        """ returns the professor after impersonation. If None, it redirects to '/' """
+        # XXX check why you need this. After all there's this decorator: @group_required(['professors'])
 
-    professor = User2Professor( user )
+        credentials = getImpersonateUser(request)
+        (user, _ ) = credentials
 
-    if professor is None:
-        HttpResponseRedirect( '/' )
+        professor = User2Professor( user )
+
+        if professor is None:
+            HttpResponseRedirect( '/' )
+
+        return professor
+
+
+    professor = get_professor_or_redirect(request)
 
     data_actual = compute_current_date(year, month, day)
-
-    #busquem el primer dilluns
-    #dia_de_la_setmana = data_actual.weekday()
-    #delta = datetime.timedelta( days = (-1 * dia_de_la_setmana ) )
-    #data_dilluns = data_actual + delta
     data_dilluns = monday_date(data_actual)
 
     #per cada dia i franja horaria fem un element.
