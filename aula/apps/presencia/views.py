@@ -5,64 +5,51 @@
 import datetime
 
 from django.conf import settings
-
+from django.template import defaultfilters
+from django.contrib import messages
+from django.urls import reverse
 from django.forms.utils import ErrorDict
-from django.template import RequestContext
+from django.http import HttpResponseRedirect
+from django.shortcuts import render, get_object_or_404
+from django.core.exceptions import ValidationError, NON_FIELD_ERRORS
+from django.http import Http404
+from django.utils import datetime_safe
+from django import forms
+from django.forms.models import modelformset_factory
+from django.forms.widgets import RadioSelect, HiddenInput, TextInput
+from django.utils.safestring import SafeText
+from django.apps import apps
+from django.db.models import Q
+
+from aula.utils.tools import getImpersonateUser, getSoftColor, executaAmbOSenseThread, unicode
 
 from aula.apps.aules.models import ReservaAula
-from aula.apps.presencia.forms import \
+from aula.apps.horaris.models import FranjaHoraria
+from aula.apps.alumnes.models import Alumne     , Grup
+from aula.apps.usuaris.models import User2Professor, Accio
+
+
+from django.contrib.auth.decorators import login_required
+from aula.utils.decorators import group_required
+
+from aula.apps.assignatures.models import Assignatura
+from aula.apps.BI.utils import dades_dissociades
+from aula.apps.BI.prediccio_assistencia import predictTreeModel
+
+from .models import Impartir, ControlAssistencia
+from .regeneraImpartir import regeneraThread
+from .reports import alertaAssitenciaReport, indicadorsReport
+from .rpt_faltesAssistenciaEntreDatesProfessor import faltesAssistenciaEntreDatesProfessorRpt
+from .business_rules.impartir import impartir_despres_de_passar_llista
+
+from .forms import \
     regeneraImpartirForm,ControlAssistenciaForm,\
     alertaAssistenciaForm, faltesAssistenciaEntreDatesForm,\
     marcarComHoraSenseAlumnesForm, passaLlistaGrupDataForm,\
     llistaLesMevesHoresForm, ControlAssistenciaFormFake
-from aula.apps.presencia.forms import afegeixTreuAlumnesLlistaForm, afegeixAlumnesLlistaExpandirForm
-from aula.apps.presencia.forms import afegeixGuardiaForm, calculadoraUnitatsFormativesForm
+from .forms import afegeixTreuAlumnesLlistaForm, afegeixAlumnesLlistaExpandirForm
+from .forms import afegeixGuardiaForm, calculadoraUnitatsFormativesForm
 
-#models
-from aula.apps.horaris.models import FranjaHoraria
-from aula.apps.presencia.models import Impartir, ControlAssistencia
-from aula.apps.alumnes.models import Alumne     , Grup
-from aula.apps.usuaris.models import User2Professor, Accio
-
-#helpers
-from aula.apps.presencia.regeneraImpartir import regeneraThread
-from aula.utils.tools import getImpersonateUser, getSoftColor, executaAmbOSenseThread, unicode
-from django.utils.safestring import SafeText
-from django.apps import apps
-
-#consultes
-from django.db.models import Q
-
-#auth
-from django.contrib.auth.decorators import login_required
-from aula.utils.decorators import group_required
-
-#workflow
-from django.http import HttpResponseRedirect
-from django.shortcuts import render, get_object_or_404
-
-#excepcions
-from django.core.exceptions import ValidationError, NON_FIELD_ERRORS
-from django.http import Http404
-
-#other
-from django.utils import datetime_safe
-from django import forms
-from aula.apps.assignatures.models import Assignatura
-from aula.apps.presencia.reports import alertaAssitenciaReport, indicadorsReport
-from aula.apps.presencia.rpt_faltesAssistenciaEntreDatesProfessor import faltesAssistenciaEntreDatesProfessorRpt
-from django.forms.models import modelformset_factory
-from django.forms.widgets import RadioSelect, HiddenInput, TextInput
-from aula.apps.BI.utils import dades_dissociades
-from aula.apps.BI.prediccio_assistencia import predictTreeModel
-from aula.apps.presencia.business_rules.impartir import impartir_despres_de_passar_llista
-
-#template filters
-#from django.template.defaultfilters import date as _date
-from django.template import defaultfilters
-
-from django.contrib import messages
-from django.urls import reverse
 
 #vistes -----------------------------------------------------------------------------------
 
@@ -106,6 +93,59 @@ def regeneraImpartir(request):
 @group_required(['professors'])
 def mostraImpartir(request, year=None, month=None, day=None):
 
+    def compute_current_date(year, month, day):
+        """ 
+            When date is set in mostraImpartir() args, it converts them into int
+            Otherwise, it considers today as date
+
+            It returns the corresponding datetime.date()
+
+            Note: no es tracta del dia d'avui, sino la data amb la que treballem
+        """
+        #si la data arriba a none posem la data d'avui
+        if not ( year and month and day):
+            today = datetime.date.today()
+            year = today.year
+            month = today.month
+            day = today.day
+        else:
+            year= int( year)
+            month = int( month )
+            day = int( day)
+        return datetime.date( year, month, day)
+
+    def genera_altres_moments(data_actual):
+        """ given:
+            - the current date
+            - the date being displayed
+            it computes the links for the prev month/week, this week, next month/week
+            It returns these links in a list of moments
+            Where one moment is a list of:
+            - the link caption
+            - the date corresponding to the moment
+            - a bool indicating whether it must be shown in a mobile
+            - a bool indicating whether it must be shown in a table/desktop
+        """
+        data_dilluns = monday_date(data_actual)
+        return [
+               # text a mostrar, data de l'enllaç, mostrar-ho a mòbil, mostrar-ho a tablet&desktop
+               [ '<< mes passat'    , data_dilluns + datetime.timedelta( days = -30 ), False, True ],
+               [ '< setmana passada' , data_dilluns + datetime.timedelta( days = -7 ), False, True ],
+               [ '< dia passat' , data_actual + datetime.timedelta( days = -1 ), True, False ],
+               [ '< avui >'    , datetime.date.today, True, True ],
+               [ 'dia vinent >' , data_actual + datetime.timedelta( days = +1 ), True, False ],
+               [ 'setmana vinent >'  , data_dilluns + datetime.timedelta( days = +7 ), False, True ],
+               [ 'mes vinent >>'      , data_dilluns + datetime.timedelta( days = +30 ), False, True ],
+            ]
+
+    def monday_date(data_actual):
+        """ Given a date, it returns the date corresponding to the Monday of the week
+            for this date """
+        dia_de_la_setmana = data_actual.weekday()
+        delta = datetime.timedelta( days = (-1 * dia_de_la_setmana ) )
+        return data_actual + delta
+
+
     credentials = getImpersonateUser(request)
     (user, _ ) = credentials
 
@@ -114,24 +154,13 @@ def mostraImpartir(request, year=None, month=None, day=None):
     if professor is None:
         HttpResponseRedirect( '/' )
 
-    #si la data arriba a none posem la data d'avui
-    if not ( year and month and day):
-        today = datetime.date.today()
-        year = today.year
-        month = today.month
-        day = today.day
-    else:
-        year= int( year)
-        month = int( month )
-        day = int( day)
-
-    #no es tracta del dia d'avui, sino la data amb la que treballem
-    data_actual = datetime.date( year, month, day)
+    data_actual = compute_current_date(year, month, day)
 
     #busquem el primer dilluns
-    dia_de_la_setmana = data_actual.weekday()
-    delta = datetime.timedelta( days = (-1 * dia_de_la_setmana ) )
-    data = data_actual + delta
+    #dia_de_la_setmana = data_actual.weekday()
+    #delta = datetime.timedelta( days = (-1 * dia_de_la_setmana ) )
+    #data_dilluns = data_actual + delta
+    data_dilluns = monday_date(data_actual)
 
     #per cada dia i franja horaria fem un element.
     impartir_tot=[]             #això són totes les franges horàries
@@ -143,7 +172,7 @@ def mostraImpartir(request, year=None, month=None, day=None):
         impartir_franja=[ [ [( unicode(f),'','','','','','','','','', )] , None ] ]
         te_imparticions = False
         for d in range(0,5):
-            dia = data + d * unDia
+            dia = data_dilluns + d * unDia
             if dia not in dies_calendari : dies_calendari.append( dia )
             franja_impartir = Q(horari__hora = f)
             dia_impartir = Q( dia_impartir = dia )
@@ -179,25 +208,15 @@ def mostraImpartir(request, year=None, month=None, day=None):
 
     nomProfessor = unicode( professor )
 
-    #navegacio pel calencari:
-    altres_moments = [
-           # text a mostrar, data de l'enllaç, mostrar-ho a mòbil, mostrar-ho a tablet&desktop
-           [ '<< mes passat'    , data + datetime.timedelta( days = -30 ), False, True ],
-           [ '< setmana passada' , data + datetime.timedelta( days = -7 ), False, True ],
-           [ '< dia passat' , data_actual + datetime.timedelta( days = -1 ), True, False ],
-           [ '< avui >'    , datetime.date.today, True, True ],
-           [ 'dia vinent >' , data_actual + datetime.timedelta( days = +1 ), True, False ],
-           [ 'setmana vinent >'  , data + datetime.timedelta( days = +7 ), False, True ],
-           [ 'mes vinent >>'      , data + datetime.timedelta( days = +30 ), False, True ],
-        ]
+    altres_moments = genera_altres_moments(data_actual)
 
     calendari = [ (defaultfilters.date( d, 'D'), d.strftime('%d/%m/%Y'), d==data_actual) for d in dies_calendari]
 
     ###miscelania Sortides: ####################################################################################
     #q's sortida es ara
-    data_llindar = max( data, datetime.date.today() )
+    data_llindar = max( data_dilluns, datetime.date.today() )
     q_fi_sortida_menor_que_dilluns = Q( dia_impartir__lt =  data_llindar )
-    q_inici_sortida_despres_divendres = Q( dia_impartir__gt = data + datetime.timedelta( days = 14 ) )
+    q_inici_sortida_despres_divendres = Q( dia_impartir__gt = data_dilluns + datetime.timedelta( days = 14 ) )
     q_sortida_no_inclou_setmana_vinent = ( q_fi_sortida_menor_que_dilluns | q_inici_sortida_despres_divendres  )
     #q es meu
     q_es_meu = Q( horari__professor = professor )
@@ -589,7 +608,7 @@ def marcarComHoraSenseAlumnes(request, pk):
         if form.is_valid() and form.cleaned_data['marcar_com_hora_sense_alumnes']:
             expandir = form.cleaned_data['expandir_a_totes_les_meves_hores']
 
-            from aula.apps.presencia.afegeixTreuAlumnesLlista import marcaSenseAlumnesThread
+            from .afegeixTreuAlumnesLlista import marcaSenseAlumnesThread
             afegeix=marcaSenseAlumnesThread(expandir = expandir, impartir=impartir )
             afegeix.start()
 
@@ -685,7 +704,7 @@ def afegeixAlumnesLlista(request, pk):
 
 
         if totBe:
-            from aula.apps.presencia.afegeixTreuAlumnesLlista import afegeixThread
+            from .afegeixTreuAlumnesLlista import afegeixThread
             afegeix=afegeixThread(expandir = expandir, alumnes=alumnes, impartir=impartir, usuari = user, matmulla = matmulla)
             executaAmbOSenseThread(afegeix)
 
@@ -785,7 +804,7 @@ def treuAlumnesLlista(request, pk):
             expandir = formExpandir.cleaned_data['expandir_a_totes_les_meves_hores']
             matmulla = formExpandir.cleaned_data['matmulla']
 
-            from aula.apps.presencia.afegeixTreuAlumnesLlista import treuThread
+            from .afegeixTreuAlumnesLlista import treuThread
             treu=treuThread(expandir = expandir, alumnes=alumnes, impartir=impartir, matmulla=matmulla,usuari=user)
             executaAmbOSenseThread(treu)
 
@@ -1165,7 +1184,7 @@ def copiarAlumnesLlista(request, pk):
 
 
 
-                from aula.apps.presencia.afegeixTreuAlumnesLlista import afegeixThread, treuThread
+                from .afegeixTreuAlumnesLlista import afegeixThread, treuThread
                 #Eliminem alumnes abans de copiar.
                 if eliminarAlumnes:
                     treu = treuThread(expandir=None, alumnes=list(alumnesDesti.values()), impartir=horaDesti, matmulla = False
