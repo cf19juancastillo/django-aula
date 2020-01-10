@@ -155,66 +155,121 @@ def mostraImpartir(request, year=None, month=None, day=None):
         credentials = getImpersonateUser(request)
         (user, _ ) = credentials
 
-        professor = User2Professor( user )
+        professor = User2Professor(user)
 
         if professor is None:
             HttpResponseRedirect( '/' )
 
         return professor
 
+    def get_franges():
+        """ composes and returns the franges horàries
+            It returns the lists:
+            - totes les franges horàries
+            - les franges horàries que potser no posarem (si estan buides i no hi ha més)
+            - els dies de calendari
+            XXX it requires some deep refactoring
+        """
+        impartir_tot=[]             #això són totes les franges horàries
+        impartir_pendents=[]        #aquí les que potser no posarem (si estan buides i no hi ha més)
+        dies_calendari=[]
+        unDia = datetime.timedelta( days = 1)
+        primera_franja_insertada = False
+        for f in FranjaHoraria.objects.all():
+            print("XXX presencia.views.mostraImpartir() FranjaHoraria", f)
+            impartir_franja=[ [ [( unicode(f),'','','','','','','','','', )] , None ] ]
+            te_imparticions = False
+            for d in range(0,5):
+                dia = data_dilluns + d * unDia
+                if dia not in dies_calendari : dies_calendari.append( dia )
+                franja_impartir = Q(horari__hora = f)
+                dia_impartir = Q( dia_impartir = dia )
+                user_impartir = Q( horari__professor = professor )
+                guardia = Q( professor_guardia  = professor )
+
+                #TODO: Passar només la impartició i que el template faci la resta de feina.
+                imparticions = [
+                                (x.horari.assignatura.nom_assignatura,          #
+                                 x.horari.grup if  x.horari.grup else '',       #
+                                 x.get_nom_aula,                             #
+                                 x.pk,                                          #
+                                 getSoftColor( x.horari.assignatura ),    #
+                                 x.color(),
+                                 x.resum(),
+                                 (x.professor_guardia  and x.professor_guardia.pk == professor.pk),
+                                 x.hi_ha_alumnes_amb_activitat_programada,
+                                 x.esReservaManual,
+                                )
+                                for x in Impartir.objects.filter( franja_impartir & dia_impartir & (user_impartir | guardia)   ) ]
+
+                impartir_franja.append( (imparticions, dia==data_actual) )
+                te_imparticions = te_imparticions or imparticions   #miro si el professor ha d'impartir classe en aquesta franja
+
+            if te_imparticions:                     #si ha d'impartir llavors afageixo la franja
+                primera_franja_insertada = True
+                impartir_tot += impartir_pendents   #afegeixo franges buides entre franges "plenes"
+                impartir_pendents = []
+                impartir_tot.append( impartir_franja )
+            else:
+                if primera_franja_insertada:
+                    impartir_pendents.append( impartir_franja ) #franges buides que potser caldrà afegir a l'horari
+        return impartir_tot, impartir_pendents, dies_calendari
+
+
 
     professor = get_professor_or_redirect(request)
-
+    nomProfessor = unicode(professor)
     data_actual = compute_current_date(year, month, day)
     data_dilluns = monday_date(data_actual)
+    altres_moments = genera_altres_moments(data_actual)
 
     #per cada dia i franja horaria fem un element.
-    impartir_tot=[]             #això són totes les franges horàries
-    impartir_pendents=[]        #aquí les que potser no posarem (si estan buides i no hi ha més)
-    dies_calendari=[]
-    unDia = datetime.timedelta( days = 1)
-    primera_franja_insertada = False
-    for f in FranjaHoraria.objects.all():
-        impartir_franja=[ [ [( unicode(f),'','','','','','','','','', )] , None ] ]
-        te_imparticions = False
-        for d in range(0,5):
-            dia = data_dilluns + d * unDia
-            if dia not in dies_calendari : dies_calendari.append( dia )
-            franja_impartir = Q(horari__hora = f)
-            dia_impartir = Q( dia_impartir = dia )
-            user_impartir = Q( horari__professor = professor )
-            guardia = Q( professor_guardia  = professor )
+    impartir_tot, impartir_pendents, dies_calendari = get_franges()
+    #impartir_tot=[]             #això són totes les franges horàries
+    #impartir_pendents=[]        #aquí les que potser no posarem (si estan buides i no hi ha més)
+    #dies_calendari=[]
+    #unDia = datetime.timedelta( days = 1)
+    #primera_franja_insertada = False
+    #for f in FranjaHoraria.objects.all():
+    #    print("XXX presencia.views.mostraImpartir() FranjaHoraria", f)
+    #    impartir_franja=[ [ [( unicode(f),'','','','','','','','','', )] , None ] ]
+    #    te_imparticions = False
+    #    for d in range(0,5):
+    #        dia = data_dilluns + d * unDia
+    #        if dia not in dies_calendari : dies_calendari.append( dia )
+    #        franja_impartir = Q(horari__hora = f)
+    #        dia_impartir = Q( dia_impartir = dia )
+    #        user_impartir = Q( horari__professor = professor )
+    #        guardia = Q( professor_guardia  = professor )
 
-            #TODO: Passar només la impartició i que el template faci la resta de feina.
-            imparticions = [
-                            (x.horari.assignatura.nom_assignatura,          #
-                             x.horari.grup if  x.horari.grup else '',       #
-                             x.get_nom_aula,                             #
-                             x.pk,                                          #
-                             getSoftColor( x.horari.assignatura ),    #
-                             x.color(),
-                             x.resum(),
-                             (x.professor_guardia  and x.professor_guardia.pk == professor.pk),
-                             x.hi_ha_alumnes_amb_activitat_programada,
-                             x.esReservaManual,
-                            )
-                            for x in Impartir.objects.filter( franja_impartir & dia_impartir & (user_impartir | guardia)   ) ]
+    #        #TODO: Passar només la impartició i que el template faci la resta de feina.
+    #        imparticions = [
+    #                        (x.horari.assignatura.nom_assignatura,          #
+    #                         x.horari.grup if  x.horari.grup else '',       #
+    #                         x.get_nom_aula,                             #
+    #                         x.pk,                                          #
+    #                         getSoftColor( x.horari.assignatura ),    #
+    #                         x.color(),
+    #                         x.resum(),
+    #                         (x.professor_guardia  and x.professor_guardia.pk == professor.pk),
+    #                         x.hi_ha_alumnes_amb_activitat_programada,
+    #                         x.esReservaManual,
+    #                        )
+    #                        for x in Impartir.objects.filter( franja_impartir & dia_impartir & (user_impartir | guardia)   ) ]
 
-            impartir_franja.append( (imparticions, dia==data_actual) )
-            te_imparticions = te_imparticions or imparticions   #miro si el professor ha d'impartir classe en aquesta franja
+    #        impartir_franja.append( (imparticions, dia==data_actual) )
+    #        te_imparticions = te_imparticions or imparticions   #miro si el professor ha d'impartir classe en aquesta franja
 
-        if te_imparticions:                     #si ha d'impartir llavors afageixo la franja
-            primera_franja_insertada = True
-            impartir_tot += impartir_pendents   #afegeixo franges buides entre franges "plenes"
-            impartir_pendents = []
-            impartir_tot.append( impartir_franja )
-        else:
-            if primera_franja_insertada:
-                impartir_pendents.append( impartir_franja ) #franges buides que potser caldrà afegir a l'horari
+    #    if te_imparticions:                     #si ha d'impartir llavors afageixo la franja
+    #        primera_franja_insertada = True
+    #        impartir_tot += impartir_pendents   #afegeixo franges buides entre franges "plenes"
+    #        impartir_pendents = []
+    #        impartir_tot.append( impartir_franja )
+    #    else:
+    #        if primera_franja_insertada:
+    #            impartir_pendents.append( impartir_franja ) #franges buides que potser caldrà afegir a l'horari
 
-    nomProfessor = unicode( professor )
 
-    altres_moments = genera_altres_moments(data_actual)
 
     calendari = [ (defaultfilters.date( d, 'D'), d.strftime('%d/%m/%Y'), d==data_actual) for d in dies_calendari]
 
