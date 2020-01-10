@@ -1,12 +1,17 @@
-# This Python file uses the following encoding: utf-8
+"""
+    Views for the presence control
+"""
+
+import datetime
+
 from django.conf import settings
-#templates
+
 from django.forms.utils import ErrorDict
 from django.template import RequestContext
 
-#formularis
 from aula.apps.aules.models import ReservaAula
-from aula.apps.presencia.forms import regeneraImpartirForm,ControlAssistenciaForm,\
+from aula.apps.presencia.forms import \
+    regeneraImpartirForm,ControlAssistenciaForm,\
     alertaAssistenciaForm, faltesAssistenciaEntreDatesForm,\
     marcarComHoraSenseAlumnesForm, passaLlistaGrupDataForm,\
     llistaLesMevesHoresForm, ControlAssistenciaFormFake
@@ -41,7 +46,7 @@ from django.core.exceptions import ValidationError, NON_FIELD_ERRORS
 from django.http import Http404
 
 #other
-from django.utils.datetime_safe import datetime, date
+from django.utils import datetime_safe
 from django import forms
 from aula.apps.assignatures.models import Assignatura
 from aula.apps.presencia.reports import alertaAssitenciaReport, indicadorsReport
@@ -53,25 +58,28 @@ from aula.apps.BI.prediccio_assistencia import predictTreeModel
 from aula.apps.presencia.business_rules.impartir import impartir_despres_de_passar_llista
 
 #template filters
-from django.template.defaultfilters import date as _date
+#from django.template.defaultfilters import date as _date
+from django.template import defaultfilters
+
 from django.contrib import messages
 from django.urls import reverse
-  
+
 #vistes -----------------------------------------------------------------------------------
+
 @login_required
 @group_required(['direcció'])
 def regeneraImpartir(request):
-    
-    head=u'Reprogramar classes segons horari actual' 
+    """ XXX include doc """
+    head=u'Reprogramar classes segons horari actual'
 
     if request.method == 'POST':
         form = regeneraImpartirForm(request.POST)
         if form.is_valid():
-            
+
             r=regeneraThread(
-                            data_inici=form.cleaned_data['data_inici'], 
+                            data_inici=form.cleaned_data['data_inici'],
                             franja_inici = form.cleaned_data['franja_inici'],
-                            user = request.user  
+                            user = request.user
                             )
             r.start()
             errors=[]
@@ -80,7 +88,7 @@ def regeneraImpartir(request):
             resultat = {   'errors': errors, 'warnings':  warnings, 'infos':  infos }
             return render(
                     request,
-                    'resultat.html', 
+                    'resultat.html',
                     {'head': head ,
                      'msgs': resultat },
             )
@@ -88,47 +96,27 @@ def regeneraImpartir(request):
         form = regeneraImpartirForm()
     return render(
                 request,
-                'form.html', 
-                {'form': form, 
+                'form.html',
+                {'form': form,
                  'head': head},
                 )
 
 
-#------------------------------------------------------------------------------------------
-#
-#@login_required
-#def mostraImpartir( request, user=None, year=None, month=None, day=None ):
-#    
-#    import datetime as t
-#    
-#    professor = None
-#    #si usuari arriba a none posem l'actual
-#    if not user:
-#        professor = User2Professor( request.user ) 
-#        user = request.user.username
-#    else:
-#        professor = get_object_or_404( Professor, username = user )
-#        
-#    if professor is None:
-#        HttpResponseRedirect( '/' )
-
 @login_required
 @group_required(['professors'])
-def mostraImpartir( request, year=None, month=None, day=None ):
-    
-    import datetime as t
-    
-    credentials = getImpersonateUser(request) 
+def mostraImpartir(request, year=None, month=None, day=None):
+
+    credentials = getImpersonateUser(request)
     (user, _ ) = credentials
-    
-    professor = User2Professor( user ) 
-        
+
+    professor = User2Professor( user )
+
     if professor is None:
         HttpResponseRedirect( '/' )
-    
-    #si la data arriba a none posem la data d'avui    
+
+    #si la data arriba a none posem la data d'avui
     if not ( year and month and day):
-        today = t.date.today()
+        today = datetime.date.today()
         year = today.year
         month = today.month
         day = today.day
@@ -136,20 +124,20 @@ def mostraImpartir( request, year=None, month=None, day=None ):
         year= int( year)
         month = int( month )
         day = int( day)
-    
-    #no es tracta del dia d'avui, sino la data amb la que treballem
-    data_actual = t.date( year, month, day)
 
-    #busquem el primer dilluns    
+    #no es tracta del dia d'avui, sino la data amb la que treballem
+    data_actual = datetime.date( year, month, day)
+
+    #busquem el primer dilluns
     dia_de_la_setmana = data_actual.weekday()
-    delta = t.timedelta( days = (-1 * dia_de_la_setmana ) )
+    delta = datetime.timedelta( days = (-1 * dia_de_la_setmana ) )
     data = data_actual + delta
-    
+
     #per cada dia i franja horaria fem un element.
     impartir_tot=[]             #això són totes les franges horàries
     impartir_pendents=[]        #aquí les que potser no posarem (si estan buides i no hi ha més)
     dies_calendari=[]
-    unDia = t.timedelta( days = 1)
+    unDia = datetime.timedelta( days = 1)
     primera_franja_insertada = False
     for f in FranjaHoraria.objects.all():
         impartir_franja=[ [ [( unicode(f),'','','','','','','','','', )] , None ] ]
@@ -169,17 +157,17 @@ def mostraImpartir( request, year=None, month=None, day=None ):
                              x.get_nom_aula,                             #
                              x.pk,                                          #
                              getSoftColor( x.horari.assignatura ),    #
-                             x.color(),                             
+                             x.color(),
                              x.resum(),
                              (x.professor_guardia  and x.professor_guardia.pk == professor.pk),
                              x.hi_ha_alumnes_amb_activitat_programada,
                              x.esReservaManual,
                             )
                             for x in Impartir.objects.filter( franja_impartir & dia_impartir & (user_impartir | guardia)   ) ]
-            
+
             impartir_franja.append( (imparticions, dia==data_actual) )
             te_imparticions = te_imparticions or imparticions   #miro si el professor ha d'impartir classe en aquesta franja
-            
+
         if te_imparticions:                     #si ha d'impartir llavors afageixo la franja
             primera_franja_insertada = True
             impartir_tot += impartir_pendents   #afegeixo franges buides entre franges "plenes"
@@ -188,38 +176,38 @@ def mostraImpartir( request, year=None, month=None, day=None ):
         else:
             if primera_franja_insertada:
                 impartir_pendents.append( impartir_franja ) #franges buides que potser caldrà afegir a l'horari
-        
+
     nomProfessor = unicode( professor )
-    
+
     #navegacio pel calencari:
     altres_moments = [
            # text a mostrar, data de l'enllaç, mostrar-ho a mòbil, mostrar-ho a tablet&desktop
-           [ '<< mes passat'    , data + t.timedelta( days = -30 ), False, True ],
-           [ '< setmana passada' , data + t.timedelta( days = -7 ), False, True ],
-           [ '< dia passat' , data_actual + t.timedelta( days = -1 ), True, False ],
-           [ '< avui >'    , t.date.today, True, True ],
-           [ 'dia vinent >' , data_actual + t.timedelta( days = +1 ), True, False ],
-           [ 'setmana vinent >'  , data + t.timedelta( days = +7 ), False, True ],
-           [ 'mes vinent >>'      , data + t.timedelta( days = +30 ), False, True ],
+           [ '<< mes passat'    , data + datetime.timedelta( days = -30 ), False, True ],
+           [ '< setmana passada' , data + datetime.timedelta( days = -7 ), False, True ],
+           [ '< dia passat' , data_actual + datetime.timedelta( days = -1 ), True, False ],
+           [ '< avui >'    , datetime.date.today, True, True ],
+           [ 'dia vinent >' , data_actual + datetime.timedelta( days = +1 ), True, False ],
+           [ 'setmana vinent >'  , data + datetime.timedelta( days = +7 ), False, True ],
+           [ 'mes vinent >>'      , data + datetime.timedelta( days = +30 ), False, True ],
         ]
-    
-    calendari = [ (_date( d, 'D'), d.strftime('%d/%m/%Y'), d==data_actual) for d in dies_calendari]
-    
+
+    calendari = [ (defaultfilters.date( d, 'D'), d.strftime('%d/%m/%Y'), d==data_actual) for d in dies_calendari]
+
     ###miscelania Sortides: ####################################################################################
     #q's sortida es ara
-    data_llindar = max( data, t.date.today() )
+    data_llindar = max( data, datetime.date.today() )
     q_fi_sortida_menor_que_dilluns = Q( dia_impartir__lt =  data_llindar )
-    q_inici_sortida_despres_divendres = Q( dia_impartir__gt = data + t.timedelta( days = 14 ) )
-    q_sortida_no_inclou_setmana_vinent = ( q_fi_sortida_menor_que_dilluns | q_inici_sortida_despres_divendres  ) 
+    q_inici_sortida_despres_divendres = Q( dia_impartir__gt = data + datetime.timedelta( days = 14 ) )
+    q_sortida_no_inclou_setmana_vinent = ( q_fi_sortida_menor_que_dilluns | q_inici_sortida_despres_divendres  )
     #q es meu
     q_es_meu = Q( horari__professor = professor )
-    
+
     imparticions_daquests_dies = Impartir.objects.filter( ~q_sortida_no_inclou_setmana_vinent & q_es_meu )
-    
+
     alumnes_surten = any ( x.hi_ha_alumnes_amb_activitat_programada for x in imparticions_daquests_dies )
-    
+
     if alumnes_surten:
-        msg =  u"""Properament hi ha activitats previstes on els teus alumnes hi participen."""  
+        msg =  u"""Properament hi ha activitats previstes on els teus alumnes hi participen."""
         messages.warning(request,  SafeText(msg ) )
 
 
@@ -227,10 +215,10 @@ def mostraImpartir( request, year=None, month=None, day=None ):
 
     return render(
                 request,
-                'mostraImpartir.html', 
+                'mostraImpartir.html',
                 {
                  'calendari': calendari,
-                 'impartir_tot': impartir_tot, 
+                 'impartir_tot': impartir_tot,
                  'professor': nomProfessor,
                  'altres_moments': altres_moments,
                  } ,
@@ -337,7 +325,7 @@ def passaLlista(request, pk):
 
         if quelcomBe:
             # algun control d'assistència s'ha desat. Desem també el model Impartir.
-            impartir.dia_passa_llista = datetime.now()
+            impartir.dia_passa_llista = datetime_safe.datetime.now()
             impartir.professor_passa_llista = User2Professor(request.user)
             impartir.currentUser = user
 
@@ -347,8 +335,8 @@ def passaLlista(request, pk):
                 # si hi ha retards, recordar que un retard provoca una incidència.
                 if hiHaRetard:
                     url_incidencies = reverse("aula__horari__posa_incidencia", kwargs={'pk': pk})
-                    msg = u"""Has posat 'Retard', recorda que els retars provoquen incidències, 
-                    s'hauran generat automàticament, valora si cal 
+                    msg = u"""Has posat 'Retard', recorda que els retars provoquen incidències,
+                    s'hauran generat automàticament, valora si cal
                     <a href="{url_incidencies}">gestionar les faltes</a>.""".format(url_incidencies=url_incidencies)
                     messages.warning(request, SafeText(msg))
                 # LOGGING
@@ -500,52 +488,52 @@ def passaLlistaGrupDataTriaGrupDia(request):
         if frm.is_valid():
             return HttpResponseRedirect( '/presencia/passaLlistaGrupData/{0}/{1}/{2}/{3}/'.format(
                                                             frm.cleaned_data['grup'].pk,
-                                                            frm.cleaned_data['dia'].day,                                      
-                                                            frm.cleaned_data['dia'].month,                                      
-                                                            frm.cleaned_data['dia'].year,                                      
+                                                            frm.cleaned_data['dia'].day,
+                                                            frm.cleaned_data['dia'].month,
+                                                            frm.cleaned_data['dia'].year,
                                                                                                   ) )
     else:
         frm = passaLlistaGrupDataForm(  )
 
     return render(
                 request,
-                  "form.html", 
+                  "form.html",
                   {"form": frm,
                    "head": u"Passa llista a grup. Tria grup i data",
                    },
                 )
-    
-    
+
+
 
 
 @login_required
 @group_required(['direcció'])
 def passaLlistaGrupData(request, grup, dia, mes, year):
-    
-    credentials = getImpersonateUser(request) 
+
+    credentials = getImpersonateUser(request)
     (user, l4) = credentials
-        
-    data = date( year = int(year), month = int(mes), day = int(dia) )
+
+    data = datetime_safe.date( year = int(year), month = int(mes), day = int(dia) )
     controls = ( ControlAssistencia.objects
                  .filter( alumne__grup = grup,  impartir__dia_impartir = data  )
                  .order_by( 'alumne', 'impartir__horari__hora__hora_inici' )
                )
-    
+
     pendents = controls.filter(  estat__isnull = True )
-    
-    frmFact = modelformset_factory( 
-                    ControlAssistencia, 
-                    extra = 0, 
+
+    frmFact = modelformset_factory(
+                    ControlAssistencia,
+                    extra = 0,
                     fields = ( 'estat', ) ,
-                    #widgets={'estat': RadioSelect( attrs={'class':'presenciaEstat'} ), } 
+                    #widgets={'estat': RadioSelect( attrs={'class':'presenciaEstat'} ), }
                     )
-    
+
     if request.method == "POST":
         formSet = frmFact( request.POST , queryset = controls  )
-        
+
         for f in formSet.forms:
             f.instance.credentials = credentials
-            
+
         if formSet.is_valid():
             formSet.save()
             return HttpResponseRedirect( '/' )
@@ -557,7 +545,7 @@ def passaLlistaGrupData(request, grup, dia, mes, year):
         for f in formSet:
             f.fields['estat'].widget = RadioSelect(
                                                 choices = [x for x in f.fields['estat'].choices][1:],
-                                                attrs={'class':'presenciaEstat'},                                                
+                                                attrs={'class':'presenciaEstat'},
                                                  )
 
             f.fields['estat'].label = u'{0} {1}'.format(  f.instance.alumne, f.instance.impartir.horari.hora )
@@ -567,7 +555,7 @@ def passaLlistaGrupData(request, grup, dia, mes, year):
 
     return render(
                 request,
-                  "passaLlistaGrup.html", 
+                  "passaLlistaGrup.html",
                   {"formset": formSet,
                    "head": u"Passa llista a grup",
                    'pendents': pendents,
@@ -581,78 +569,78 @@ def passaLlistaGrupData(request, grup, dia, mes, year):
 @login_required
 @group_required(['professors'])
 def marcarComHoraSenseAlumnes(request, pk):
-    credentials = getImpersonateUser(request) 
-    (user, l4) = credentials   
-    
-    head=u'Afegir alumnes a la llista' 
+    credentials = getImpersonateUser(request)
+    (user, l4) = credentials
+
+    head=u'Afegir alumnes a la llista'
 
     pk = int(pk)
     impartir = Impartir.objects.get ( pk = pk )
-    
+
     #seg-------------------------------
     pertany_al_professor = user.pk in [ impartir.horari.professor.pk,   \
                                         impartir.professor_guardia.pk if impartir.professor_guardia else -1 ]
     if not ( l4 or pertany_al_professor):
-        raise Http404() 
+        raise Http404()
 
-    
+
     if request.method == "POST":
         form = marcarComHoraSenseAlumnesForm( request.POST  )
-        if form.is_valid() and form.cleaned_data['marcar_com_hora_sense_alumnes']:   
+        if form.is_valid() and form.cleaned_data['marcar_com_hora_sense_alumnes']:
             expandir = form.cleaned_data['expandir_a_totes_les_meves_hores']
-                          
+
             from aula.apps.presencia.afegeixTreuAlumnesLlista import marcaSenseAlumnesThread
             afegeix=marcaSenseAlumnesThread(expandir = expandir, impartir=impartir )
             afegeix.start()
 
             #LOGGING
-            Accio.objects.create( 
+            Accio.objects.create(
                     tipus = 'LL',
                     usuari = user,
                     l4 = l4,
                     impersonated_from = request.user if request.user != user else None,
                     text = u"""Marcar classe sense alumnes {0}""".format(
-                                impartir )                                                        
+                                impartir )
                         )
-                
+
             import time
             while afegeix and not afegeix.primerDiaFet(): time.sleep(  0.5 )
 
-            url_next = '/presencia/mostraImpartir/%d/%d/%d/'% ( 
+            url_next = '/presencia/mostraImpartir/%d/%d/%d/'% (
                                     impartir.dia_impartir.year,
                                     impartir.dia_impartir.month,
-                                    impartir.dia_impartir.day )    
-                            
+                                    impartir.dia_impartir.day )
+
             return HttpResponseRedirect(url_next )
     else:
         form = marcarComHoraSenseAlumnesForm( initial= { 'marcar_com_hora_sense_alumnes': True, }  )
 
     return render(
                 request,
-                  "form.html", 
+                  "form.html",
                   {"form": form,
                    "head": head,
                    },
                 )
-        
+
 
 @login_required
 @group_required(['professors'])
 def afegeixAlumnesLlista(request, pk):
-    credentials = getImpersonateUser(request) 
-    (user, l4) = credentials   
-    
-    head=u'Afegir alumnes a la llista' 
+    credentials = getImpersonateUser(request)
+    (user, l4) = credentials
+
+    head=u'Afegir alumnes a la llista'
 
     pk = int(pk)
     impartir = Impartir.objects.get ( pk = pk )
-    
+
     #seg-------------------------------
     pertany_al_professor = user.pk in [ impartir.horari.professor.pk,   \
                                         impartir.professor_guardia.pk if impartir.professor_guardia else -1 ]
     if not ( l4 or pertany_al_professor):
-        raise Http404() 
-        
+        raise Http404()
+
     alumnes_pk = [ ca.alumne.pk for ca in impartir.controlassistencia_set.all()]
     #http://www.ibm.com/developerworks/opensource/library/os-django-models/index.html?S_TACT=105AGX44&S_CMP=EDU
 
@@ -661,87 +649,87 @@ def afegeixAlumnesLlista(request, pk):
 
     formset = []
     if request.method == "POST":
-        
+
         expandir = False
         alumnes = []
-        
+
         totBe = True
-        
+
         #
         #primer form: expandir
         #
-        formExpandir=afegeixAlumnesLlistaExpandirForm( request.POST, prefix='tots')    
-        formset.append( formExpandir )    
+        formExpandir=afegeixAlumnesLlistaExpandirForm( request.POST, prefix='tots')
+        formset.append( formExpandir )
         if formExpandir.is_valid():
             expandir = formExpandir.cleaned_data['expandir_a_totes_les_meves_hores']
             matmulla = formExpandir.cleaned_data['matmulla']
         else:
-            totBe = False        
+            totBe = False
         #
-        #altres forms: grups d'alumnes        
+        #altres forms: grups d'alumnes
         #
         for grup in grups_a_mostrar:
             form=afegeixTreuAlumnesLlistaForm(
                                     request.POST,
                                     prefix=str( grup.pk ),
-                                    queryset =  grup.alumne_set.exclude( pk__in = alumnes_pk )  ,       
-                                    etiqueta = unicode(grup)                             
+                                    queryset =  grup.alumne_set.exclude( pk__in = alumnes_pk )  ,
+                                    etiqueta = unicode(grup)
                                      )
             formset.append( form )
-            if form.is_valid():                
+            if form.is_valid():
                 alumnes += form.cleaned_data['alumnes']
             else:
                 totBe = False
 
         #TODO: afegir error a mà
 
-        
+
         if totBe:
             from aula.apps.presencia.afegeixTreuAlumnesLlista import afegeixThread
             afegeix=afegeixThread(expandir = expandir, alumnes=alumnes, impartir=impartir, usuari = user, matmulla = matmulla)
             executaAmbOSenseThread(afegeix)
 
             #LOGGING
-            Accio.objects.create( 
+            Accio.objects.create(
                     tipus = 'LL',
                     usuari = user,
                     l4 = l4,
                     impersonated_from = request.user if request.user != user else None,
                     text = u"""Posar alumnes de la classe {0} (Forçat:{1}, Expandir:{2}): {3}""".format(
-                                impartir,                                                                         
-                                u'Sí' if matmulla else 'No', 
-                                u'Sí' if expandir else 'No', 
-                                u', '.join( [ unicode(a) for a in alumnes  ] )                                                        
+                                impartir,
+                                u'Sí' if matmulla else 'No',
+                                u'Sí' if expandir else 'No',
+                                u', '.join( [ unicode(a) for a in alumnes  ] )
                                   )
                 )
-                        
+
             #espero a que estigui fet el primer dia: abans de mostrar la pantalla de passar llista
             import time
             while afegeix and not afegeix.primerDiaFet(): time.sleep(  0.5 )
-            
+
             return HttpResponseRedirect('/presencia/passaLlista/%s/'% pk )
 
     else:
-        
+
         #primer form: expandir
-        formExpandir=afegeixAlumnesLlistaExpandirForm( 
-                                            prefix='tots', 
+        formExpandir=afegeixAlumnesLlistaExpandirForm(
+                                            prefix='tots',
                                             initial={'expandir_a_totes_les_meves_hores':False})
         formset.append( formExpandir )
 
-        #altres forms: grups d'alumnes        
+        #altres forms: grups d'alumnes
         for grup in grups_a_mostrar:
             #http://www.ibm.com/developerworks/opensource/library/os-django-models/index.html?S_TACT=105AGX44&S_CMP=EDU
             form=afegeixTreuAlumnesLlistaForm(
                                     prefix=str( grup.pk ),
-                                    queryset =  grup.alumne_set.exclude( pk__in = alumnes_pk )  ,                                    
-                                    etiqueta = unicode( grup )                             
+                                    queryset =  grup.alumne_set.exclude( pk__in = alumnes_pk )  ,
+                                    etiqueta = unicode( grup )
                                      )
             formset.append( form )
-        
+
     return render(
                 request,
-                  "AfegirAlumnes.html", 
+                  "AfegirAlumnes.html",
                   {"formset": formset,
                    "head": head,
                    },
@@ -753,100 +741,100 @@ def afegeixAlumnesLlista(request, pk):
 @login_required
 @group_required(['professors'])
 def treuAlumnesLlista(request, pk):
-    credentials = getImpersonateUser(request) 
-    (user, l4) = credentials   
-    
-    head=u'Treure alumnes de la llista' 
+    credentials = getImpersonateUser(request)
+    (user, l4) = credentials
+
+    head=u'Treure alumnes de la llista'
 
     pk = int(pk)
     impartir = Impartir.objects.get ( pk = pk )
-    
+
     #seg-------------------------------
     pertany_al_professor = user.pk in [ impartir.horari.professor.pk,   \
                                        impartir.professor_guardia.pk if impartir.professor_guardia else -1]
     if not ( l4 or pertany_al_professor):
-        raise Http404() 
-    
+        raise Http404()
+
 
     formset = []
     alumnes = []
     if request.method == "POST":
-        
+
         expandir = False
-        
+
         #
         #primer form: expandir
         #
-        formExpandir=afegeixAlumnesLlistaExpandirForm( request.POST, prefix='tots')  
+        formExpandir=afegeixAlumnesLlistaExpandirForm( request.POST, prefix='tots')
         formExpandir.fields["matmulla"].help_text = u'''Marca aquesta opció per treure alumnes tot i que hagi passat llista (només els absents)'''
-        formExpandir.fields["matmulla"].label = u'Força treure'      
+        formExpandir.fields["matmulla"].label = u'Força treure'
 
-        
+
         #
-        #altres forms: grups d'alumnes        
+        #altres forms: grups d'alumnes
         #
         form=afegeixTreuAlumnesLlistaForm(
                                 request.POST,
                                 prefix=str( 'alumnes' ),
-                                queryset =  Alumne.objects.filter( pk__in = [ ca.alumne.pk for ca in impartir.controlassistencia_set.all()  ] )   ,       
-                                etiqueta = 'Alumnes a treure:'                             
+                                queryset =  Alumne.objects.filter( pk__in = [ ca.alumne.pk for ca in impartir.controlassistencia_set.all()  ] )   ,
+                                etiqueta = 'Alumnes a treure:'
                                  )
 
         if form.is_valid() and formExpandir.is_valid():
             alumnes += form.cleaned_data['alumnes']
             expandir = formExpandir.cleaned_data['expandir_a_totes_les_meves_hores']
-            matmulla = formExpandir.cleaned_data['matmulla']            
-        
+            matmulla = formExpandir.cleaned_data['matmulla']
+
             from aula.apps.presencia.afegeixTreuAlumnesLlista import treuThread
             treu=treuThread(expandir = expandir, alumnes=alumnes, impartir=impartir, matmulla=matmulla,usuari=user)
             executaAmbOSenseThread(treu)
 
             #LOGGING
-            Accio.objects.create( 
+            Accio.objects.create(
                     tipus = 'LL',
                     usuari = user,
                     l4 = l4,
                     impersonated_from = request.user if request.user != user else None,
                     text = u"""Treure alumnes de la classe {0} (Forçat:{1}, Expandir:{2}): {3}""".format(
-                                impartir,                                                                         
-                                u'Sí' if matmulla else 'No', 
-                                u'Sí' if expandir else 'No', 
-                                u', '.join( [ unicode(a) for a in alumnes  ] )                                                        
+                                impartir,
+                                u'Sí' if matmulla else 'No',
+                                u'Sí' if expandir else 'No',
+                                u', '.join( [ unicode(a) for a in alumnes  ] )
                                   )
                 )
-                        
+
             #espero que estigui fet el primer dia abans de mostrar la pantalla de passar llista
             import time
             while treu and not treu.primerDiaFet(): time.sleep(  0.5 )
-            
-            #afegeix.join()      #todo: missatge i redirecció!!!  
-            #(' procés d'insertar alumnes engegat, pot trigar una estona. si no apareixen els alumnes prem el butó 'refrescar' del navegador' 
+
+            #afegeix.join()      #todo: missatge i redirecció!!!
+            #(' procés d'insertar alumnes engegat, pot trigar una estona. si no apareixen els alumnes prem el butó 'refrescar' del navegador'
             #'/presencia/passaLlista/%s/' )
-            
+
             return HttpResponseRedirect('/presencia/passaLlista/%s/'% pk )
-        
+
     else:
-        
+
         #primer form: expandir
-        formExpandir=afegeixAlumnesLlistaExpandirForm( 
-                                            prefix='tots', 
+        formExpandir=afegeixAlumnesLlistaExpandirForm(
+                                            prefix='tots',
                                             initial={'expandir_a_totes_les_meves_hores':False})
         formExpandir.fields["matmulla"].help_text = u'''Marca aquesta opció per treure alumnes tot i que hagi passat llista (només els absents)'''
-        formExpandir.fields["matmulla"].label = u'Força treure'      
+        formExpandir.fields["matmulla"].label = u'Força treure'
 
         formset.append( formExpandir )
 
-        #altres forms: grups d'alumnes               
+        #altres forms: grups d'alumnes
         form=afegeixTreuAlumnesLlistaForm(
                                 prefix=str( 'alumnes' ),
-                                queryset =  Alumne.objects.filter( pk__in = [ ca.alumne.pk for ca in impartir.controlassistencia_set.all()  ] )  ,       
-                                etiqueta = 'Alumnes a treure:'                               
+                                queryset =  Alumne.objects.filter( pk__in = [ ca.alumne.pk for ca in impartir.controlassistencia_set.all()  ] )  ,
+                                etiqueta = 'Alumnes a treure:'
                                  )
         formset.append( form )
-        
+
     return render(
                 request,
-                  "AfegirAlumnes.html", 
+                  "AfegirAlumnes.html",
                   {"formset": formset,
                    "head": head,
                    "missatge":u"""Atenció, no s'esborraran els alumnes que ja s'hagi passat llista o els que tinguin
@@ -858,62 +846,62 @@ def treuAlumnesLlista(request, pk):
 @login_required
 @group_required(['professors'])
 def afegeixGuardia(request, dia=None, mes=None, year=None):
-    
-    credentials = getImpersonateUser(request) 
-    (user, _ ) = credentials
-        
-    head=u'Fer guardia' 
 
-    url_next = '/presencia/mostraImpartir/%d/%d/%d/'% ( 
+    credentials = getImpersonateUser(request)
+    (user, _ ) = credentials
+
+    head=u'Fer guardia'
+
+    url_next = '/presencia/mostraImpartir/%d/%d/%d/'% (
                                     int(year),
                                     int(mes),
-                                    int(dia ) )    
+                                    int(dia ) )
     if request.method == 'POST':
         form = afegeixGuardiaForm(request.POST)
-        
+
         if form.is_valid():
-            
+
             professor = form.cleaned_data['professor']
             franges = form.cleaned_data['franges']
-            dia_impartir = date( int(year), int(mes), int(dia)  )
+            dia_impartir = datetime_safe.date( int(year), int(mes), int(dia)  )
             professor_guardia = User2Professor( user )
             Impartir.objects.filter( dia_impartir = dia_impartir,
                                      horari__professor = professor,
-                                     horari__hora__in = franges 
+                                     horari__hora__in = franges
                                     ).update( professor_guardia = professor_guardia  )
 
             return HttpResponseRedirect( url_next )
-                                    
-                             
+
+
     else:
         form = afegeixGuardiaForm()
     return render(
                 request,
-                'form.html', 
-                {'form': form, 
+                'form.html',
+                {'form': form,
                  'head': head},
                 )
 
-    
+
 @login_required
 @group_required(['professors'])
 def esborraGuardia(request, pk):
-    credentials = getImpersonateUser(request) 
+    credentials = getImpersonateUser(request)
     (user, l4) = credentials
-    
+
     impartir = get_object_or_404( Impartir, pk = pk )
 
-    url_next = '/presencia/mostraImpartir/%d/%d/%d/'% (                                     
+    url_next = '/presencia/mostraImpartir/%d/%d/%d/'% (
                                     impartir.dia_impartir.year,
                                     impartir.dia_impartir.month,
                                     impartir.dia_impartir.day )
-    
+
     #seg-------------------------------
     pertany_al_professor = ( impartir.professor_guardia is not None) and (  user.pk == impartir.professor_guardia.pk )
     if not ( l4 or pertany_al_professor):
         return HttpResponseRedirect( url_next )
-    
-    if impartir.professor_guardia == User2Professor(user):    
+
+    if impartir.professor_guardia == User2Professor(user):
         impartir.professor_guardia = None
         impartir.currentUser = user
         impartir.save()
@@ -923,25 +911,25 @@ def esborraGuardia(request, pk):
 
 @login_required
 @group_required(['professors'])
-def calculadoraUnitatsFormatives(request):    
+def calculadoraUnitatsFormatives(request):
 
-    credentials = getImpersonateUser(request) 
+    credentials = getImpersonateUser(request)
     (user, _ ) = credentials
 
-    professor = User2Professor( user ) 
-        
+    professor = User2Professor( user )
+
     head=u'Calculadora Unitats Formatives'
     infoForm = []
-    
+
     grupsProfessor = Grup.objects.filter( horari__professor = professor  ).order_by('curs').distinct()
-    assignaturesProfessor = Assignatura.objects.filter( 
-                                        horari__professor = professor, 
+    assignaturesProfessor = Assignatura.objects.filter(
+                                        horari__professor = professor,
                                         horari__grup__isnull = False ).order_by('curs','nom_assignatura').distinct()
 
     if request.method == 'POST':
         form = calculadoraUnitatsFormativesForm( request.POST, assignatures = assignaturesProfessor, grups = grupsProfessor )
-        
-        if form.is_valid():            
+
+        if form.is_valid():
             grup = form.cleaned_data['grup']
             assignatures = form.cleaned_data['assignatura']
             dataInici = form.cleaned_data['dataInici']
@@ -949,13 +937,13 @@ def calculadoraUnitatsFormatives(request):
             imparticionsAssignatura = Impartir.objects.filter( dia_impartir__gte = dataInici,
                                                                horari__assignatura__in = assignatures,
                                                                horari__grup = grup,
-                                                               horari__professor = professor  
+                                                               horari__professor = professor
                                                                ).order_by( 'dia_impartir', 'horari__hora'  )
             if imparticionsAssignatura.count() < hores:
-                form._errors.setdefault(NON_FIELD_ERRORS, []).extend(  
+                form._errors.setdefault(NON_FIELD_ERRORS, []).extend(
                            [ u'''A partir de la data {0} només hi ha {1} hores,
                                    comprova que has triat bé el curs.
-                                   '''.format( 
+                                   '''.format(
                                                 dataInici,
                                                 imparticionsAssignatura.count()
                                                 ) ] )
@@ -964,42 +952,42 @@ def calculadoraUnitatsFormatives(request):
                     darreraImparticio = imparticionsAssignatura[hores-1]
                     infoForm = [ ('Darrera classe', u'dia {0} a les {1}'.format( darreraImparticio.dia_impartir, darreraImparticio.horari.hora.hora_inici )), ]
                 except Exception as e:
-                    form._errors.setdefault(NON_FIELD_ERRORS, []).extend(  [e]  )  
-            
-                
-                             
+                    form._errors.setdefault(NON_FIELD_ERRORS, []).extend(  [e]  )
+
+
+
     else:
         form = calculadoraUnitatsFormativesForm( assignatures = assignaturesProfessor , grups = grupsProfessor)
     return render(
                 request,
-                'form.html', 
-                {'form': form, 
+                'form.html',
+                {'form': form,
                  'infoForm': infoForm,
                  'head': head},
                 )
-    
+
 
 #------------------------------------------------------------------------------------------
 
 @login_required
 @group_required(['direcció'])
 def alertaAssistencia(request):
-    credentials = getImpersonateUser(request) 
-    (user, l4) = credentials   
-    
-    head=u'''Alerta alumnes''' 
-    
+    credentials = getImpersonateUser(request)
+    (user, l4) = credentials
+
+    head=u'''Alerta alumnes'''
+
     if request.method == 'POST':
         form = alertaAssistenciaForm(request.POST)
         if form.is_valid():
-            report = alertaAssitenciaReport( 
+            report = alertaAssitenciaReport(
                             data_inici = form.cleaned_data['data_inici'],
                             data_fi = form.cleaned_data['data_fi'],
-                            nivell = form.cleaned_data['nivell'],                                         
+                            nivell = form.cleaned_data['nivell'],
                             tpc = form.cleaned_data['tpc']  ,
-                            ordenacio = form.cleaned_data['ordenacio']  ,                      
+                            ordenacio = form.cleaned_data['ordenacio']  ,
                                              )
-            
+
             return render(
                         request,
                         'report.html',
@@ -1007,18 +995,18 @@ def alertaAssistencia(request):
                              'head': 'Informació alumnes' ,
                             },
                         )
- 
+
     else:
         form = alertaAssistenciaForm()
-        
+
     return render(
             request,
-            'alertaAbsentisme.html', 
+            'alertaAbsentisme.html',
             {'head': head ,
              'form': form },
             )
 
-#amorilla@xtec.cat 
+#amorilla@xtec.cat
 @login_required
 @group_required(['direcció'])
 def indicadors(request):
@@ -1036,7 +1024,7 @@ def indicadors(request):
                 },
             )
 
-#amorilla@xtec.cat 
+#amorilla@xtec.cat
 @login_required
 @group_required(['direcció'])
 def indcsv(request):
@@ -1046,35 +1034,35 @@ def indcsv(request):
 
 @login_required
 @group_required(['professors'])
-def faltesAssistenciaEntreDates(request):    
+def faltesAssistenciaEntreDates(request):
 
-    credentials = getImpersonateUser(request) 
+    credentials = getImpersonateUser(request)
     (user, _ ) = credentials
 
-    professor = User2Professor( user ) 
-        
+    professor = User2Professor( user )
+
     head=u'Calculadora %assistència entre Dates'
     infoForm = []
-    
+
     grupsProfessor = Grup.objects.filter( horari__professor = professor  ).order_by('curs').distinct()
-    assignaturesProfessor = Assignatura.objects.filter( 
-                                        horari__professor = professor, 
+    assignaturesProfessor = Assignatura.objects.filter(
+                                        horari__professor = professor,
                                         horari__grup__isnull = False ).order_by('curs','nom_assignatura').distinct()
 
     if request.method == 'POST':
         form = faltesAssistenciaEntreDatesForm( request.POST, assignatures = assignaturesProfessor, grups = grupsProfessor )
-        
-        if form.is_valid():            
 
-            report = faltesAssistenciaEntreDatesProfessorRpt( 
+        if form.is_valid():
+
+            report = faltesAssistenciaEntreDatesProfessorRpt(
                 professor = professor,
                 grup = form.cleaned_data['grup'],
                 assignatures = form.cleaned_data['assignatura'],
                 dataDesDe = form.cleaned_data['dataDesDe'],
                 horaDesDe = form.cleaned_data['horaDesDe'],
                 dataFinsA = form.cleaned_data['dataFinsA'],
-                horaFinsA = form.cleaned_data['horaFinsA']                                       
-                                         )                
+                horaFinsA = form.cleaned_data['horaFinsA']
+                                         )
             return render(
                     request,
                     'reportTabs.html',
@@ -1083,52 +1071,51 @@ def faltesAssistenciaEntreDates(request):
                         },
                     )
 #            except Exception as e:
-#                form._errors.setdefault(NON_FIELD_ERRORS, []).extend(  [e]  )  
-            
-                
-                             
+#                form._errors.setdefault(NON_FIELD_ERRORS, []).extend(  [e]  )
+
+
+
     else:
         form = faltesAssistenciaEntreDatesForm( assignatures = assignaturesProfessor , grups = grupsProfessor)
     return render(
                 request,
-                'form.html', 
-                {'form': form, 
+                'form.html',
+                {'form': form,
                  #'infoForm': [],
                  'head': head},
                 )
-    
+
 
 # -----------------------------------------------------------------------------
 
 @login_required
 @group_required(['professors'])
 def copiarAlumnesLlista(request, pk):
-    credentials = getImpersonateUser(request) 
-    (user, l4) = credentials   
-    
-    head=u'Copiar alumnes a la llista a partir d\'una altre hora' 
+    credentials = getImpersonateUser(request)
+    (user, l4) = credentials
+
+    head=u'Copiar alumnes a la llista a partir d\'una altre hora'
 
     pk = int(pk)
     impartir = Impartir.objects.get ( pk = pk )
-    
+
     #seg-------------------------------
     pertany_al_professor = user.pk in [ impartir.horari.professor.pk,   \
                                         impartir.professor_guardia.pk if impartir.professor_guardia else -1 ]
     if not ( l4 or pertany_al_professor):
-        raise Http404() 
+        raise Http404()
 
-    formset = []    
+    formset = []
 
     formHores = None
 
-    import datetime as t
 
-    dataRef = date.today()
-    dillunsSetmana = dataRef + t.timedelta(days=-dataRef.weekday())
+    dataRef = datetime_safe.date.today()
+    dillunsSetmana = dataRef + datetime.timedelta(days=-dataRef.weekday())
     #4 és el divendres 0,1,2,3,4 (5é dia)
-    divendresSetmana = dataRef + t.timedelta(days=4-dataRef.weekday())
-    dInici = date(year=dillunsSetmana.year, month=dillunsSetmana.month, day=dillunsSetmana.day)
-    dFi = date(year=divendresSetmana.year, month=divendresSetmana.month, day=divendresSetmana.day)
+    divendresSetmana = dataRef + datetime.timedelta(days=4-dataRef.weekday())
+    dInici = datetime_safe.date(year=dillunsSetmana.year, month=dillunsSetmana.month, day=dillunsSetmana.day)
+    dFi = datetime_safe.date(year=divendresSetmana.year, month=divendresSetmana.month, day=divendresSetmana.day)
 
     horarisProfe = Impartir.objects \
                     .filter(dia_impartir__gte=dInici) \
@@ -1138,8 +1125,8 @@ def copiarAlumnesLlista(request, pk):
     opcions = []
     for eH in horarisProfe:
         assistencies = ControlAssistencia.objects.filter(impartir__id=eH.id)
-        opcions.append((eH.id, 
-            unicode(eH.horari.assignatura) + " " + unicode(eH.horari.dia_de_la_setmana) + " " + unicode(eH.horari.hora) + 
+        opcions.append((eH.id,
+            unicode(eH.horari.assignatura) + " " + unicode(eH.horari.dia_de_la_setmana) + " " + unicode(eH.horari.hora) +
             u'--> Alumnes: ' + unicode(len(assistencies)) + ''))
 
     if request.method == "POST":
@@ -1156,7 +1143,7 @@ def copiarAlumnesLlista(request, pk):
                 formHores._errors.setdefault(NON_FIELD_ERRORS, []).extend(
                     [ u'''No pots copiar alumnes sobre la mateixa hora.'''])
             else:
-                
+
                 #Obtenir llista d'alumnes de destí per veure solapaments.
                 alumnesDesti = {}
                 assistenciesDesti = ControlAssistencia.objects.filter(impartir__id=idHoraDesti)
@@ -1175,9 +1162,9 @@ def copiarAlumnesLlista(request, pk):
                         if ca.alumne.id not in alumnesDesti:
                             alumnesAAfegir.append(ca.alumne)
 
-                
 
-   
+
+
                 from aula.apps.presencia.afegeixTreuAlumnesLlista import afegeixThread, treuThread
                 #Eliminem alumnes abans de copiar.
                 if eliminarAlumnes:
@@ -1190,13 +1177,13 @@ def copiarAlumnesLlista(request, pk):
                     treu.join()
 
                     #LOGGING
-                    Accio.objects.create( 
+                    Accio.objects.create(
                             tipus = 'LL',
                             usuari = user,
                             l4 = l4,
                             impersonated_from = request.user if request.user != user else None,
                             text = u"""Copiar alumnes, eliminar alumnes de {0}: {1}""".format(
-                                        horaDesti, 
+                                        horaDesti,
                                         u', '.join( [ unicode(a) for a in alumnesDesti ])))
 
 
@@ -1205,16 +1192,16 @@ def copiarAlumnesLlista(request, pk):
                 afegeix.start()
 
                 #LOGGING
-                Accio.objects.create( 
+                Accio.objects.create(
                         tipus = 'LL',
                         usuari = user,
                         l4 = l4,
                         impersonated_from = request.user if request.user != user else None,
                         text = u"""Copiar alumnes de {0} a {1}: {2}""".format(
-                                    impartir,                                                                         
-                                    horaDesti, 
+                                    impartir,
+                                    horaDesti,
                                     u', '.join( [ unicode(a) for a in alumnesAAfegir ])))
-                            
+
                 #espero a que estigui fet el primer dia: abans de mostrar la pantalla de passar llista
                 import time
                 while afegeix and not afegeix.primerDiaFet(): time.sleep(  0.5 )
@@ -1223,16 +1210,16 @@ def copiarAlumnesLlista(request, pk):
         formHores = llistaLesMevesHoresForm(llistaHoresProfe=opcions)
 
     formset.append(formHores)
-    
+
     return render(
                 request,
-                  "formset.html", 
+                  "formset.html",
                   {"formset": formset,
                    "head": head,
                    },
                 )
 
-    
+
 #------------------------------------------------------------------------------------------
 
 @login_required
@@ -1267,15 +1254,15 @@ def anularImpartir(request, pk):
         if user.groups.filter(name="professors").exists():
             try:
                 impartir.professor_passa_llista = User2Professor( user )
-                impartir.dia_passa_llista =  datetime.now()
+                impartir.dia_passa_llista =  datetime_safe.datetime.now()
                 impartir.save()
             except ValidationError as e:
                 for _, v in e.message_dict.items():
                     errors.append(v)
 
         if not bool(errors):
-            messages.success(request, u"""Operació finalitzada. 
-            S'han marcat tots els controls d'assistència d'aquesta classe com anul·lats. 
+            messages.success(request, u"""Operació finalitzada.
+            S'han marcat tots els controls d'assistència d'aquesta classe com anul·lats.
             Si el professor posa nous alumnes a la classe caldria repetir el procés. """)
         else:
             messages.error(request,u"S'han trobat errors anul·lant aquesta hora de classe: {}". format (u", ".join(errors)) )
