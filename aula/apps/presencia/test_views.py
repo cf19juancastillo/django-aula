@@ -79,15 +79,12 @@ def test_mostraImpartir(monkeypatch):
     found_impartir_tot = response[0][2]['impartir_tot']
     assert expected_impartir_tot == found_impartir_tot
     
-    expected_dates_altres_moments = [   # ignoring today
-        datetime.date(2019, 12, 7),     # mes passat
-        datetime.date(2019, 12, 30),    # setmana passada
-        datetime.date(2020, 1, 8),      # dia passat
-        datetime.date(2020, 1, 10),     # dia vinent
-        datetime.date(2020, 1, 13),     # setmana vinent
-        datetime.date(2020, 2, 5),      # mesvinent
-    ]
+    expected_dates_altres_moments = '2019-12-07,2019-12-30,2020-01-08,2020-01-10,2020-01-13,2020-02-05'
+
     found_altres_moments = response[0][2]['altres_moments']
-    found_dates_altres_moments = [m[1] for m in found_altres_moments if 'avui' not in m[0]]
+    found_dates_altres_moments = ','.join([str(m[1]) for m in found_altres_moments if 'avui' not in m[0]])
     assert expected_dates_altres_moments == found_dates_altres_moments
+
+    #print("XXX", found_dates_altres_moments)
+    #assert False
 
