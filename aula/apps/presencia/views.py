@@ -94,6 +94,7 @@ def regeneraImpartir(request):
 @group_required(['professors'])
 def mostraImpartir(request, year=None, month=None, day=None):
     """ vista que mostra les franges horàries d'una setmana """
+    print("XXX", request)
 
     def compute_current_date(year, month, day):
         """ 
@@ -204,6 +205,7 @@ def mostraImpartir(request, year=None, month=None, day=None):
                                  x.esReservaManual,
                                 )
                                 for x in Impartir.objects.filter( franja_impartir & dia_impartir & (user_impartir | guardia)   ) ]
+                print("XXX presencia.views.mostraImpartir() imparticions", imparticions)
 
                 impartir_franja.append( (imparticions, dia==data_actual) )
                 te_imparticions = te_imparticions or imparticions   #miro si el professor ha d'impartir classe en aquesta franja
