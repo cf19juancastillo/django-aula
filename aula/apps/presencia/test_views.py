@@ -29,66 +29,83 @@ def test_mostraImpartir_with_imparticions(monkeypatch):
         def __repr__(self):
             return self.__str__()
 
-    def fake_group_objects_get(**kwargs):
-        return 'professors'
-
-    def fake_render(*args, **kwargs):
-        return (args, kwargs)
-
-    user = Empty({
-        'pk': 1001,
-        'is_authenticated': lambda _: True,
-        'groups': Empty({
-            'objects': Empty({
-                'get': lambda _: ['professors'],
-            }),
-            'all': lambda: ['professors'],
-        })
-    })
-
     class RequestMessages:
         def __init__(self):
             self.contents = []
         def add(self, level, message, extra_tag):
             self.contents.append(f'level: {level} msg: {message} extra_tag:{extra_tag}')
 
-    request = Empty({
-        'user': user,
-        'session': Empty({
-           'has_key': lambda _: False,       # no impersonation
-        }),
-        'path_info': 'fake/path/info',
-        '_messages': RequestMessages(),
-    })
 
-    impartir01 = Empty({
-        'horari': Empty({
-            #'08:15 a 09:15',
-            'assignatura': Empty({'nom_assignatura':'TEC'}),
-            'grup': None,
+    fake_db = {
+        'request' : Empty({
+            'user': Empty(
+                {
+                    'pk': 1001,
+                    'is_authenticated': lambda _: True,
+                    'groups': Empty({
+                        'objects': Empty({
+                            'get': lambda _: ['professors'],
+                        }),
+                        'all': lambda: ['professors'],
+                    })
+                }),
+            'session': Empty({
+                'has_key': lambda _: False,       # no impersonation
+            }),
+            'path_info': 'fake/path/info',
+            '_messages': RequestMessages(),
         }),
-        'get_nom_aula': 'Aula1',
-        'color': lambda: None,
-        'resum': lambda: None,
-        'pk': 1002,
-        'professor_guardia': Empty({'pk': 1001}),
-        'hi_ha_alumnes_amb_activitat_programada': False,
-        'esReservaManual': False,
-    })
+        'imparticions': [
+            [ 
+                Empty({
+                    'horari': Empty({
+                        #'08:15 a 09:15',
+                        'assignatura': Empty({'nom_assignatura':'TEC'}),
+                        'grup': None,
+                    }),
+                    'get_nom_aula': 'Aula1',
+                    'color': lambda: None,
+                    'resum': lambda: None,
+                    'pk': 1002,
+                    'professor_guardia': Empty({'pk': 1001}),
+                    'hi_ha_alumnes_amb_activitat_programada': False,
+                    'esReservaManual': False,
+                }),
 
-    impartir02 = Empty({
-        'horari': Empty({
-            'assignatura': Empty({'nom_assignatura':'NAT'}),
-            'grup': None,
-        }),
-        'get_nom_aula': 'Aula1',
-        'color': lambda: None,
-        'resum': lambda: None,
-        'pk': 1003,
-        'professor_guardia': Empty({'pk': 1004}),
-        'hi_ha_alumnes_amb_activitat_programada': True,
-        'esReservaManual': False,
-    })
+                Empty({
+                    'horari': Empty({
+                        'assignatura': Empty({'nom_assignatura':'NAT'}),
+                        'grup': None,
+                    }),
+                    'get_nom_aula': 'Aula1',
+                    'color': lambda: None,
+                    'resum': lambda: None,
+                    'pk': 1003,
+                    'professor_guardia': Empty({'pk': 1004}),
+                    'hi_ha_alumnes_amb_activitat_programada': True,
+                    'esReservaManual': False,
+                })
+
+            ]
+        ],
+        'groups': [
+            'professors',
+        ],
+        'horaris':[
+            ['08:15 a 09:15', '09:15 a 10:15'],
+        ],
+        'dates':[
+            (2020, 1, 9),
+        ]
+
+    }
+
+    def fake_group_objects_get(**kwargs):
+        return fake_db['groups'][0]
+
+    def fake_render(*args, **kwargs):
+        return (args, kwargs)
+
 
     # let's monkeypatch
     monkeypatch.setattr(Group, 'objects', Empty({
@@ -97,17 +114,17 @@ def test_mostraImpartir_with_imparticions(monkeypatch):
     monkeypatch.setattr(views, 'User2Professor', lambda u: u)
     monkeypatch.setattr(views, 'getSoftColor', lambda _: '#softcolor')
     monkeypatch.setattr(FranjaHoraria, 'objects', Empty({
-        'all': lambda : ['08:15 a 09:15', '09:15 a 10:15'],
+        'all': lambda : fake_db['horaris'][0],
     }))
     monkeypatch.setattr(Impartir, 'objects', Empty({
-        'filter': lambda _: [impartir01, impartir02]
+        'filter': lambda _: fake_db['imparticions'][0]
     }))
     monkeypatch.setattr(views, 'render', fake_render)
 
 
     # call to the function under test
-    year, month, day = 2020, 1, 9
-    response = mostraImpartir(request, year=year, month=month, day=day)
+    year, month, day = fake_db['dates'][0]
+    response = mostraImpartir(fake_db['request'], year=year, month=month, day=day)
 
 
     # set expectations
@@ -166,5 +183,8 @@ def test_mostraImpartir_with_imparticions(monkeypatch):
     found_altres_moments = response[0][2]['altres_moments']
     found_dates_altres_moments = ','.join([str(m[1]) for m in found_altres_moments if 'avui' not in m[0]])
     assert expected_dates_altres_moments == found_dates_altres_moments
+
+
+    #assert False
 
 

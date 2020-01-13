@@ -96,7 +96,7 @@ def mostraImpartir(request, year=None, month=None, day=None):
     """ vista que mostra les franges horàries d'una setmana """
 
     def compute_current_date(year, month, day):
-        """ 
+        """
             When date is set in mostraImpartir() args, it converts them into int
             Otherwise, it considers today as date
 
@@ -170,40 +170,73 @@ def mostraImpartir(request, year=None, month=None, day=None):
 
             # per cada dia i franja horaria fem un element.
 
-            XXX it requires some deep refactoring
         """
+
+        def get_imparticions(franja, day, professor):
+            """ composes the list of imparticions that:
+                - are within the franja
+                - correspond to the given day
+                - are in the schedule of professor as the teacher or as professor de quàrcia
+
+                the result is a list of tuples:
+                - nom_assignatura
+                - nom_aula
+                - impartir id
+                - a soft color
+                - a color
+                - a summary
+                - whether this impartició has the professor as professor de guardia
+                - hi_ha_alumnes_amb_activitat_programada
+                - esReservaManual
+            """
+            # compose query
+            franja_impartir = Q(horari__hora = franja)
+            dia_impartir = Q(dia_impartir = day)
+            user_impartir = Q(horari__professor = professor)
+            guardia = Q(professor_guardia  = professor)
+
+            # collect imparticions
+            imparticions = []
+            entries = Impartir.objects.filter(
+                franja_impartir &
+                dia_impartir &
+                (user_impartir | guardia)
+            )
+            print("XXX (1) Impartir.objects.filter()")
+            for entry in entries:
+                imparticio = (
+                        entry.horari.assignatura.nom_assignatura,
+                        entry.horari.grup if  entry.horari.grup else '',
+                        entry.get_nom_aula,
+                        entry.pk,
+                        getSoftColor( entry.horari.assignatura ),
+                        entry.color(),
+                        entry.resum(),
+                        (
+                            entry.professor_guardia and
+                            entry.professor_guardia.pk == professor.pk
+                        ),
+                        entry.hi_ha_alumnes_amb_activitat_programada,
+                        entry.esReservaManual,
+                    )
+                print("XXX \tnew imparticio", imparticio)
+                imparticions.append(imparticio)
+            return imparticions
+
+
+
         impartir_tot=[]             #això són totes les franges horàries
         impartir_pendents=[]        #aquí les que potser no posarem (si estan buides i no hi ha més)
         dies_calendari=[]
         unDia = datetime.timedelta( days = 1)
         primera_franja_insertada = False
-        for f in FranjaHoraria.objects.all():
-            impartir_franja=[ [ [( unicode(f),'','','','','','','','','', )] , None ] ]
+        for franja in FranjaHoraria.objects.all():
+            impartir_franja=[ [ [( unicode(franja),'','','','','','','','','', )] , None ] ]
             te_imparticions = False
             for d in range(0,5):
                 dia = data_dilluns + d * unDia
                 if dia not in dies_calendari : dies_calendari.append( dia )
-                franja_impartir = Q(horari__hora = f)
-                dia_impartir = Q( dia_impartir = dia )
-                user_impartir = Q( horari__professor = professor )
-                guardia = Q( professor_guardia  = professor )
-
-                #TODO: Passar només la impartició i que el template faci la resta de feina.
-                imparticions = [
-                                (x.horari.assignatura.nom_assignatura,          #
-                                 x.horari.grup if  x.horari.grup else '',       #
-                                 x.get_nom_aula,                             #
-                                 x.pk,                                          #
-                                 getSoftColor( x.horari.assignatura ),    #
-                                 x.color(),
-                                 x.resum(),
-                                 (x.professor_guardia  and x.professor_guardia.pk == professor.pk),
-                                 x.hi_ha_alumnes_amb_activitat_programada,
-                                 x.esReservaManual,
-                                )
-                                for x in Impartir.objects.filter( franja_impartir & dia_impartir & (user_impartir | guardia)   ) ]
-
-
+                imparticions = get_imparticions(franja, dia, professor)
                 impartir_franja.append( (imparticions, dia==data_actual) )
                 te_imparticions = te_imparticions or imparticions   #miro si el professor ha d'impartir classe en aquesta franja
 
@@ -241,6 +274,7 @@ def mostraImpartir(request, year=None, month=None, day=None):
     q_es_meu = Q( horari__professor = professor )
 
     imparticions_daquests_dies = Impartir.objects.filter( ~q_sortida_no_inclou_setmana_vinent & q_es_meu )
+    print("XXX (2) imparticions_daquests_dies.objects.filter()", imparticions_daquests_dies)
 
     alumnes_surten = any ( x.hi_ha_alumnes_amb_activitat_programada for x in imparticions_daquests_dies )
 
@@ -1136,6 +1170,7 @@ def copiarAlumnesLlista(request, pk):
 
     pk = int(pk)
     impartir = Impartir.objects.get ( pk = pk )
+    print("XXX (5) impartir.objects.filter() impartir", impartir)
 
     #seg-------------------------------
     pertany_al_professor = user.pk in [ impartir.horari.professor.pk,   \
@@ -1160,6 +1195,7 @@ def copiarAlumnesLlista(request, pk):
                     .filter(dia_impartir__lte=dFi) \
                     .filter(horari__professor=user.pk) \
                     .order_by('horari')
+    print("XXX (4) impartir.objects.filter() horarisProfes", horarisProfes)
     opcions = []
     for eH in horarisProfe:
         assistencies = ControlAssistencia.objects.filter(impartir__id=eH.id)
@@ -1176,6 +1212,7 @@ def copiarAlumnesLlista(request, pk):
             idHoraOrigen = formHores.cleaned_data['hores']
             idHoraDesti = pk
             horaDesti = Impartir.objects.get(id=idHoraDesti)
+            print("XXX (3) Impartir.objects.filter() horaDesti", horaDesti)
 
             if int(idHoraOrigen) == int(idHoraDesti):
                 formHores._errors.setdefault(NON_FIELD_ERRORS, []).extend(

@@ -2,9 +2,12 @@ On getting coverage
 
 pytest --cov=aula.apps.presencia.views --cov-report term-missing --cov-report html:cov.html --cov-branch -v aula/apps/presencia/test_views.py
 
-Test should be able to check lines 216-217
-This requires the test to indicate the professor is not assigned to a
-certain franja horaria
+
+Tests should recreate real situation. Take the contents of imparticions
+from the real execution and place them in a test
+
+You're checking the Impartir.objects calls to simulate real contents
+
 
 Old todo's from original author
 
