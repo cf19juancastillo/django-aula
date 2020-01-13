@@ -94,7 +94,6 @@ def regeneraImpartir(request):
 @group_required(['professors'])
 def mostraImpartir(request, year=None, month=None, day=None):
     """ vista que mostra les franges horàries d'una setmana """
-    print("XXX", request)
 
     def compute_current_date(year, month, day):
         """ 
@@ -160,10 +159,9 @@ def mostraImpartir(request, year=None, month=None, day=None):
 
         if professor is None:
             HttpResponseRedirect( '/' )
-
         return professor
 
-    def get_franges_i_calendari():
+    def get_franges_i_calendari(professor):
         """ composes and returns the franges horàries
             It returns the lists:
             - totes les franges horàries
@@ -180,7 +178,6 @@ def mostraImpartir(request, year=None, month=None, day=None):
         unDia = datetime.timedelta( days = 1)
         primera_franja_insertada = False
         for f in FranjaHoraria.objects.all():
-            print("XXX presencia.views.mostraImpartir() FranjaHoraria", f)
             impartir_franja=[ [ [( unicode(f),'','','','','','','','','', )] , None ] ]
             te_imparticions = False
             for d in range(0,5):
@@ -205,7 +202,7 @@ def mostraImpartir(request, year=None, month=None, day=None):
                                  x.esReservaManual,
                                 )
                                 for x in Impartir.objects.filter( franja_impartir & dia_impartir & (user_impartir | guardia)   ) ]
-                print("XXX presencia.views.mostraImpartir() imparticions", imparticions)
+
 
                 impartir_franja.append( (imparticions, dia==data_actual) )
                 te_imparticions = te_imparticions or imparticions   #miro si el professor ha d'impartir classe en aquesta franja
@@ -229,7 +226,7 @@ def mostraImpartir(request, year=None, month=None, day=None):
     data_actual = compute_current_date(year, month, day)
     data_dilluns = monday_date(data_actual)
     altres_moments = genera_altres_moments(data_actual)
-    impartir_tot, impartir_pendents, calendari = get_franges_i_calendari()
+    impartir_tot, impartir_pendents, calendari = get_franges_i_calendari(professor)
 
 
     #calendari = [ (defaultfilters.date( d, 'D'), d.strftime('%d/%m/%Y'), d==data_actual) for d in dies_calendari]
