@@ -46,12 +46,19 @@ def test_mostraImpartir_with_imparticions(monkeypatch):
         })
     })
 
+    class RequestMessages:
+        def __init__(self):
+            self.contents = []
+        def add(self, level, message, extra_tag):
+            self.contents.append(f'level: {level} msg: {message} extra_tag:{extra_tag}')
+
     request = Empty({
         'user': user,
         'session': Empty({
            'has_key': lambda _: False,       # no impersonation
         }),
         'path_info': 'fake/path/info',
+        '_messages': RequestMessages(),
     })
 
     impartir01 = Empty({
@@ -79,7 +86,7 @@ def test_mostraImpartir_with_imparticions(monkeypatch):
         'resum': lambda: None,
         'pk': 1003,
         'professor_guardia': Empty({'pk': 1004}),
-        'hi_ha_alumnes_amb_activitat_programada': False,
+        'hi_ha_alumnes_amb_activitat_programada': True,
         'esReservaManual': False,
     })
 
@@ -119,36 +126,37 @@ def test_mostraImpartir_with_imparticions(monkeypatch):
 
     expected_impartir_tot = [[[[('08:15 a 09:15', '', '', '', '', '', '', '', '', '')], None],
                               ([('TEC', '', 'Aula1', 1002, '#softcolor', None, None, True, False, False),
-                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, False, False)],
+                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, True, False)],
                                False),
                               ([('TEC', '', 'Aula1', 1002, '#softcolor', None, None, True, False, False),
-                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, False, False)],
+                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, True, False)],
                                False),
                               ([('TEC', '', 'Aula1', 1002, '#softcolor', None, None, True, False, False),
-                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, False, False)],
+                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, True, False)],
                                False),
                               ([('TEC', '', 'Aula1', 1002, '#softcolor', None, None, True, False, False),
-                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, False, False)],
+                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, True, False)],
                                True),
                               ([('TEC', '', 'Aula1', 1002, '#softcolor', None, None, True, False, False),
-                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, False, False)],
+                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, True, False)],
                                False)],
                              [[[('09:15 a 10:15', '', '', '', '', '', '', '', '', '')], None],
                               ([('TEC', '', 'Aula1', 1002, '#softcolor', None, None, True, False, False),
-                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, False, False)],
+                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, True, False)],
                                False),
                               ([('TEC', '', 'Aula1', 1002, '#softcolor', None, None, True, False, False),
-                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, False, False)],
+                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, True, False)],
                                False),
                               ([('TEC', '', 'Aula1', 1002, '#softcolor', None, None, True, False, False),
-                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, False, False)],
+                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, True, False)],
                                False),
                               ([('TEC', '', 'Aula1', 1002, '#softcolor', None, None, True, False, False),
-                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, False, False)],
+                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, True, False)],
                                True),
                               ([('TEC', '', 'Aula1', 1002, '#softcolor', None, None, True, False, False),
-                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, False, False)],
+                                ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, True, False)],
                                False)]]
+
 
     found_impartir_tot = response[0][2]['impartir_tot']
     assert expected_impartir_tot == found_impartir_tot
