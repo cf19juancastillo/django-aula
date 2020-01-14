@@ -17,17 +17,18 @@ from .views import Impartir
 from .views import User2Professor
 from aula.apps.presencia import views
 
+class Empty:
+    def __init__(self, params=None):
+        if params:
+            self.__dict__ = params
+    def __str__(self):
+        return str(self.__dict__)
+    def __repr__(self):
+        return self.__str__()
 
-def test_mostraImpartir_with_imparticions(monkeypatch):
-    """ This test is aimed to get presencia.views.mostraImpartir properly tested """
-    class Empty:
-        def __init__(self, params=None):
-            if params:
-                self.__dict__ = params
-        def __str__(self):
-            return str(self.__dict__)
-        def __repr__(self):
-            return self.__str__()
+@pytest.fixture()
+def fake_db():
+    """ definition of the db cases """
 
     class RequestMessages:
         def __init__(self):
@@ -35,8 +36,7 @@ def test_mostraImpartir_with_imparticions(monkeypatch):
         def add(self, level, message, extra_tag):
             self.contents.append(f'level: {level} msg: {message} extra_tag:{extra_tag}')
 
-
-    fake_db = {
+    db = {
         'request' : Empty({
             'user': Empty(
                 {
@@ -97,51 +97,20 @@ def test_mostraImpartir_with_imparticions(monkeypatch):
         'dates':[
             (2020, 1, 9),
         ]
-
     }
-
-    def fake_group_objects_get(**kwargs):
-        return fake_db['groups'][0]
-
-    def fake_render(*args, **kwargs):
-        return (args, kwargs)
+    return db
 
 
-    # let's monkeypatch
-    monkeypatch.setattr(Group, 'objects', Empty({
-        'get': fake_group_objects_get
-    }))
-    monkeypatch.setattr(views, 'User2Professor', lambda u: u)
-    monkeypatch.setattr(views, 'getSoftColor', lambda _: '#softcolor')
-    monkeypatch.setattr(FranjaHoraria, 'objects', Empty({
-        'all': lambda : fake_db['horaris'][0],
-    }))
-    monkeypatch.setattr(Impartir, 'objects', Empty({
-        'filter': lambda _: fake_db['imparticions'][0]
-    }))
-    monkeypatch.setattr(views, 'render', fake_render)
+@pytest.fixture()
+def expected():
+    """ composes and returns the expected values for each test set """
+    return [
+        {
+            'expected_template' : 'mostraImpartir.html',
+            'expected_professor_pk': "'pk': 1001",
+            'expected_days' : [ '06/01/2020', '07/01/2020', '08/01/2020', '09/01/2020', '10/01/2020'],
 
-
-    # call to the function under test
-    year, month, day = fake_db['dates'][0]
-    response = mostraImpartir(fake_db['request'], year=year, month=month, day=day)
-
-
-    # set expectations
-    expected_template = 'mostraImpartir.html'
-    found_template = response[0][1]
-    assert expected_template == found_template
-
-    expected_professor_pk = "'pk': 1001"
-    found_professor = response[0][2]['professor']
-    assert expected_professor_pk in found_professor
-
-    found_calendari = response[0][2]['calendari']
-    expected_days = [ '06/01/2020', '07/01/2020', '08/01/2020', '09/01/2020', '10/01/2020']
-    found_days = [ c[1] for c in found_calendari ]
-    assert expected_days == found_days
-
-    expected_impartir_tot = [[[[('08:15 a 09:15', '', '', '', '', '', '', '', '', '')], None],
+            'expected_impartir_tot' : [[[[('08:15 a 09:15', '', '', '', '', '', '', '', '', '')], None],
                               ([('TEC', '', 'Aula1', 1002, '#softcolor', None, None, True, False, False),
                                 ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, True, False)],
                                False),
@@ -172,17 +141,64 @@ def test_mostraImpartir_with_imparticions(monkeypatch):
                                True),
                               ([('TEC', '', 'Aula1', 1002, '#softcolor', None, None, True, False, False),
                                 ('NAT', '', 'Aula1', 1003, '#softcolor', None, None, False, True, False)],
-                               False)]]
+                               False)]],
+
+            'expected_dates_altres_moments' : '2019-12-07,2019-12-30,2020-01-08,2020-01-10,2020-01-13,2020-02-05',
+        },
+    ]
+
+
+
+@pytest.mark.parametrize("test_set", [0,],)
+def test_mostraImpartir_with_imparticions(monkeypatch, fake_db, expected, test_set):
+    """ This test is aimed to get presencia.views.mostraImpartir properly tested """
+
+    def fake_group_objects_get(**kwargs):
+        return fake_db['groups'][0]
+
+    def fake_render(*args, **kwargs):
+        return (args, kwargs)
+
+
+    # let's monkeypatch
+    monkeypatch.setattr(Group, 'objects', Empty({
+        'get': fake_group_objects_get
+    }))
+    monkeypatch.setattr(views, 'User2Professor', lambda u: u)
+    monkeypatch.setattr(views, 'getSoftColor', lambda _: '#softcolor')
+    monkeypatch.setattr(FranjaHoraria, 'objects', Empty({
+        'all': lambda : fake_db['horaris'][test_set],
+    }))
+    monkeypatch.setattr(Impartir, 'objects', Empty({
+        'filter': lambda _: fake_db['imparticions'][test_set]
+    }))
+    monkeypatch.setattr(views, 'render', fake_render)
+
+
+    # call to the function under test
+    year, month, day = fake_db['dates'][test_set]
+    response = mostraImpartir(fake_db['request'], year=year, month=month, day=day)
+
+
+    # assertion bunch
+    found_template = response[0][1]
+    assert expected[test_set]['expected_template'] == found_template
+
+    found_professor = response[0][2]['professor']
+    assert expected[test_set]['expected_professor_pk'] in found_professor
+
+    found_calendari = response[0][2]['calendari']
+    found_days = [ c[1] for c in found_calendari ]
+    assert expected[test_set]['expected_days'] == found_days
 
 
     found_impartir_tot = response[0][2]['impartir_tot']
-    assert expected_impartir_tot == found_impartir_tot
+    assert expected[test_set]['expected_impartir_tot'] == found_impartir_tot
 
-    expected_dates_altres_moments = '2019-12-07,2019-12-30,2020-01-08,2020-01-10,2020-01-13,2020-02-05'
 
     found_altres_moments = response[0][2]['altres_moments']
     found_dates_altres_moments = ','.join([str(m[1]) for m in found_altres_moments if 'avui' not in m[0]])
-    assert expected_dates_altres_moments == found_dates_altres_moments
+    assert expected[test_set]['expected_dates_altres_moments'] == found_dates_altres_moments
 
 
     #assert False
